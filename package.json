@@ -1,0 +1,9 @@
+{
+  "name": "persona",
+  "version": "1.0.0",
+  "description": "Persona extension for pi",
+  "dependencies": {},
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}
