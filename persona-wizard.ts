@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { MultiSelectList, type MultiSelectItem } from "./multi-select-list";
 
 export enum SystemPromptMode {
   REPLACE = "replace",
@@ -72,6 +73,45 @@ async function askSelect(
   return found ? found.value : null;
 }
 
+async function askToolsSelect(pi: ExtensionAPI, ctx: ExtensionContext): Promise<string[]> {
+  const c = ensureCtx(ctx);
+  const allTools = await pi.getAllTools();
+  const items: MultiSelectItem[] = allTools.map((tool: { name: string }) => ({
+    value: tool.name,
+    label: tool.name,
+  }));
+
+  // Default: select read, grep, find, ls
+  const defaultTools = ["read", "grep", "find", "ls"];
+  const selected = new Set(items.filter((i) => defaultTools.includes(i.value)).map((i) => i.value));
+
+  return new Promise<string[]>((resolve) => {
+    const multiSelect = new MultiSelectList(items, Math.min(15, items.length), {
+      selectedPrefix: (s: string) => `\x1b[32m${s}\x1b[0m`,
+      unselectedPrefix: (s: string) => `\x1b[90m${s}\x1b[0m`,
+      selectedText: (s: string) => `\x1b[32m${s}\x1b[0m`,
+      unselectedText: (s: string) => s,
+    });
+
+    // Override the default selected set
+    multiSelect.selected = selected;
+
+    c.ui.custom((tui: any, _theme: any, _kb: any, done: (result: any) => void) => {
+      multiSelect.onSelect = () => {
+        const values = multiSelect.getSelectedValues();
+        done(null);
+        resolve(values);
+      };
+      multiSelect.onCancel = () => {
+        const values = multiSelect.getSelectedValues();
+        done(null);
+        resolve(values);
+      };
+      return multiSelect;
+    });
+  });
+}
+
 async function askConfirm(ctx: ExtensionContext, prompt: string): Promise<boolean> {
   const c = ensureCtx(ctx);
   const result = await c.ui.confirm("Persona Wizard", prompt);
@@ -116,13 +156,8 @@ export async function runPersonaWizard(pi: ExtensionAPI, ctx: ExtensionContext):
     if (!description) return ctx.ui.notify("Wizard cancelled.", "info");
 
     // Step 3: Tools
-    const toolsInput = await askInput(
-      ctx,
-      "Tools (comma-separated, e.g., 'read, grep, find, ls, bash, mcp:chrome-devtools'):",
-      "read, grep, find, ls"
-    );
-    if (!toolsInput) return ctx.ui.notify("Wizard cancelled.", "info");
-    const tools = toolsInput.split(",").map((t) => t.trim()).filter(Boolean);
+    const tools = await askToolsSelect(pi, ctx);
+    if (tools.length === 0) return ctx.ui.notify("Wizard cancelled.", "info");
 
     // Step 4: System prompt mode
     const systemPromptMode = await askSelect(ctx, "System prompt mode:", SYSTEM_PROMPT_MODES);
