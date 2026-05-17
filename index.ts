@@ -59,7 +59,7 @@ export default function (pi: ExtensionAPI) {
       if (prefix.startsWith("delete ")) {
         const search = prefix.slice(7).trim();
         const filtered = personas.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
-        return filtered.map((p) => ({ value: p.name, label: p.name }));
+        return filtered.map((p) => ({ value: `delete ${p.name}`, label: p.name }));
       }
 
       // Otherwise show command suggestions + personas
