@@ -3,14 +3,14 @@ import path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export enum SystemPromptMode {
-  Replace = "replace",
-  Append = "append",
+  REPLACE = "replace",
+  APPEND = "append",
 }
 
 export enum PersonaScope {
-  Global = "global",
-  Project = "project",
-  Ephemeral = "ephemeral",
+  GLOBAL = "global",
+  PROJECT = "project",
+  EPHEMERAL = "ephemeral",
 }
 
 export interface PersonaConfig {
@@ -33,14 +33,14 @@ interface SelectOption {
 }
 
 const SCOPES: readonly SelectOption[] = [
-  { value: PersonaScope.Global, label: "Global (~/.pi/agent/personas/)" },
-  { value: PersonaScope.Project, label: "Project (.pi/personas/)" },
-  { value: PersonaScope.Ephemeral, label: "Ephemeral (in-memory, cleared on session restart)" },
+  { value: PersonaScope.GLOBAL, label: "Global (~/.pi/agent/personas/)" },
+  { value: PersonaScope.PROJECT, label: "Project (.pi/personas/)" },
+  { value: PersonaScope.EPHEMERAL, label: "Ephemeral (in-memory, cleared on session restart)" },
 ] as const;
 
 const SYSTEM_PROMPT_MODES: readonly SelectOption[] = [
-  { value: SystemPromptMode.Replace, label: "Replace — overwrite the entire system prompt" },
-  { value: SystemPromptMode.Append, label: "Append — add to the end of the system prompt" },
+  { value: SystemPromptMode.REPLACE, label: "Replace — overwrite the entire system prompt" },
+  { value: SystemPromptMode.APPEND, label: "Append — add to the end of the system prompt" },
 ] as const;
 
 function ensureCtx(ctx: ExtensionContext | undefined): ExtensionContext {
@@ -93,11 +93,11 @@ ${config.systemPrompt}`;
 }
 
 function getPersonaFilePath(scope: PersonaScope, name: string): string | null {
-  const lowerName = name.toLowerCase();
-  if (scope === PersonaScope.Global) {
-    return `~/.pi/agent/personas/${lowerName}.yaml`;
-  } else if (scope === PersonaScope.Project) {
-    return `.pi/personas/${lowerName}.yaml`;
+  const safeName = name.toLowerCase().replace(/\s+/g, "-");
+  if (scope === PersonaScope.GLOBAL) {
+    return `~/.pi/agent/personas/${safeName}.yaml`;
+  } else if (scope === PersonaScope.PROJECT) {
+    return `.pi/personas/${safeName}.yaml`;
   }
   return null; // ephemeral
 }
@@ -154,7 +154,7 @@ export async function runPersonaWizard(pi: ExtensionAPI, ctx: ExtensionContext):
     };
 
     // Handle ephemeral
-    if (scope === PersonaScope.Ephemeral) {
+    if (scope === PersonaScope.EPHEMERAL) {
       pi.appendEntry("ephemeral-persona", config);
       ctx.ui.notify(`✨ Ephemeral persona "${name}" created (in-memory only)`, "success");
       return;
