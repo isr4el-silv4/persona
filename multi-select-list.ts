@@ -4,14 +4,6 @@ import {
   type Component,
 } from "@earendil-works/pi-tui";
 
-// Key constants (mirrors @earendil-works/pi-tui)
-const KEY_UP = "up";
-const KEY_DOWN = "down";
-const KEY_SPACE = " ";
-const KEY_ENTER = "enter";
-const KEY_ESCAPE = "escape";
-const KEY_CTRL_A = "ctrl(a)";
-
 export interface MultiSelectItem {
   value: string;
   label: string;
@@ -56,16 +48,16 @@ export class MultiSelectList implements Component {
   }
 
   handleInput(data: string): void {
-    if (matchesKey(data, KEY_UP) && this.highlighted > 0) {
+    if (matchesKey(data, "up") && this.highlighted > 0) {
       this.highlighted--;
       this.invalidate();
     } else if (
-      matchesKey(data, KEY_DOWN) &&
+      matchesKey(data, "down") &&
       this.highlighted < this.items.length - 1
     ) {
       this.highlighted++;
       this.invalidate();
-    } else if (matchesKey(data, KEY_SPACE)) {
+    } else if (matchesKey(data, "space")) {
       const item = this.items[this.highlighted];
       if (item) {
         if (this.selected.has(item.value)) {
@@ -75,7 +67,7 @@ export class MultiSelectList implements Component {
         }
         this.invalidate();
       }
-    } else if (matchesKey(data, KEY_CTRL_A)) {
+    } else if (matchesKey(data, "ctrl+a")) {
       // Ctrl+A: select/deselect all
       const allSelected = this.items.every((item) => this.selected.has(item.value));
       if (allSelected) {
@@ -84,9 +76,9 @@ export class MultiSelectList implements Component {
         this.items.forEach((item) => this.selected.add(item.value));
       }
       this.invalidate();
-    } else if (matchesKey(data, KEY_ENTER)) {
+    } else if (matchesKey(data, "enter")) {
       this.onSelect?.();
-    } else if (matchesKey(data, KEY_ESCAPE)) {
+    } else if (matchesKey(data, "escape")) {
       this.onCancel?.();
     }
   }

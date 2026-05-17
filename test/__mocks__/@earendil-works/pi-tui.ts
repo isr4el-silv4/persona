@@ -6,20 +6,12 @@ export interface Component {
 }
 
 export const matchesKey = (data: string, key: string): boolean => {
-  if (key === " ") return data === " " || data === "space";
+  if (key === "space") return data === " " || data === "space";
   if (key === "enter") return data === "enter" || data === "\r";
   if (key === "escape") return data === "escape" || data === "\x1b";
-  if (key === "ctrl(a)") return data === "ctrl+a" || data === "\x01";
+  if (key === "ctrl+a") return data === "ctrl+a" || data === "\x01";
   return data === key;
 };
-
-// Key constants (mirrors @earendil-works/pi-tui)
-export const KEY_UP = "up";
-export const KEY_DOWN = "down";
-export const KEY_SPACE = " ";
-export const KEY_ENTER = "enter";
-export const KEY_ESCAPE = "escape";
-export const KEY_CTRL_A = "ctrl(a)";
 
 export const Key: {
   readonly up: string;
