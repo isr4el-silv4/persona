@@ -2,11 +2,22 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
+export enum SystemPromptMode {
+  Replace = "replace",
+  Append = "append",
+}
+
+export enum PersonaScope {
+  Global = "global",
+  Project = "project",
+  Ephemeral = "ephemeral",
+}
+
 export interface PersonaConfig {
   name: string;
   description: string;
   tools: string[];
-  systemPromptMode: "replace" | "append";
+  systemPromptMode: SystemPromptMode;
   inheritProjectContext: boolean;
   interactive: boolean;
   systemPrompt: string;
@@ -17,19 +28,19 @@ export interface EphemeralPersona {
 }
 
 interface SelectOption {
-  value: string;
+  value: SystemPromptMode | PersonaScope;
   label: string;
 }
 
 const SCOPES: readonly SelectOption[] = [
-  { value: "global", label: "Global (~/.pi/agent/personas/)" },
-  { value: "project", label: "Project (.pi/personas/)" },
-  { value: "ephemeral", label: "Ephemeral (in-memory, cleared on session restart)" },
+  { value: PersonaScope.Global, label: "Global (~/.pi/agent/personas/)" },
+  { value: PersonaScope.Project, label: "Project (.pi/personas/)" },
+  { value: PersonaScope.Ephemeral, label: "Ephemeral (in-memory, cleared on session restart)" },
 ] as const;
 
 const SYSTEM_PROMPT_MODES: readonly SelectOption[] = [
-  { value: "replace", label: "Replace — overwrite the entire system prompt" },
-  { value: "append", label: "Append — add to the end of the system prompt" },
+  { value: SystemPromptMode.Replace, label: "Replace — overwrite the entire system prompt" },
+  { value: SystemPromptMode.Append, label: "Append — add to the end of the system prompt" },
 ] as const;
 
 function ensureCtx(ctx: ExtensionContext | undefined): ExtensionContext {
@@ -81,11 +92,12 @@ interactive: ${config.interactive}
 ${config.systemPrompt}`;
 }
 
-function getPersonaFilePath(scope: string, name: string): string | null {
-  if (scope === "global") {
-    return `~/.pi/agent/personas/${name}.yaml`;
-  } else if (scope === "project") {
-    return `.pi/personas/${name}.yaml`;
+function getPersonaFilePath(scope: PersonaScope, name: string): string | null {
+  const lowerName = name.toLowerCase();
+  if (scope === PersonaScope.Global) {
+    return `~/.pi/agent/personas/${lowerName}.yaml`;
+  } else if (scope === PersonaScope.Project) {
+    return `.pi/personas/${lowerName}.yaml`;
   }
   return null; // ephemeral
 }
@@ -135,21 +147,21 @@ export async function runPersonaWizard(pi: ExtensionAPI, ctx: ExtensionContext):
       name,
       description,
       tools,
-      systemPromptMode: systemPromptMode as "replace" | "append",
+      systemPromptMode: systemPromptMode as SystemPromptMode,
       inheritProjectContext,
       interactive,
       systemPrompt,
     };
 
     // Handle ephemeral
-    if (scope === "ephemeral") {
+    if (scope === PersonaScope.Ephemeral) {
       pi.appendEntry("ephemeral-persona", config);
       ctx.ui.notify(`✨ Ephemeral persona "${name}" created (in-memory only)`, "success");
       return;
     }
 
     // Handle file-based personas
-    const filePath = getPersonaFilePath(scope, name);
+    const filePath = getPersonaFilePath(scope as PersonaScope, name);
     if (!filePath) return;
 
     const yaml = generateYaml(config);

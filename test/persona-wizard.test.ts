@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 
 // These imports will use the mocked module
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { generateYaml, type PersonaConfig } from "../persona-wizard";
+import { generateYaml, type PersonaConfig, SystemPromptMode, PersonaScope } from "../persona-wizard";
 
 // Mock the UI methods
 const mockInput = jest.fn();
@@ -70,7 +70,7 @@ describe("Persona Wizard", () => {
         name: "scout",
         description: "Fast codebase recon",
         tools: ["read", "grep", "find", "ls", "bash", "mcp:chrome-devtools"],
-        systemPromptMode: "replace",
+        systemPromptMode: SystemPromptMode.Replace,
         inheritProjectContext: false,
         interactive: true,
         systemPrompt: "You are a fast codebase recon agent.",
@@ -94,7 +94,7 @@ describe("Persona Wizard", () => {
         name: "helper",
         description: "Helpful assistant",
         tools: ["read", "grep"],
-        systemPromptMode: "append",
+        systemPromptMode: SystemPromptMode.Append,
         inheritProjectContext: true,
         interactive: false,
         systemPrompt: "Be helpful and concise.",
@@ -112,7 +112,7 @@ describe("Persona Wizard", () => {
         name: "minimal",
         description: "Minimal persona",
         tools: [],
-        systemPromptMode: "replace",
+        systemPromptMode: SystemPromptMode.Replace,
         inheritProjectContext: false,
         interactive: false,
         systemPrompt: "Do nothing.",
@@ -131,7 +131,7 @@ describe("Persona Wizard", () => {
         name: "test-scoped",
         description: "Test scoped persona",
         tools: ["read", "grep", "find"],
-        systemPromptMode: "replace",
+        systemPromptMode: SystemPromptMode.Replace,
         inheritProjectContext: false,
         interactive: true,
         systemPrompt: "You are a test persona.",
@@ -159,7 +159,7 @@ describe("Persona Wizard", () => {
         name: "nested-test",
         description: "Nested test",
         tools: ["read"],
-        systemPromptMode: "append",
+        systemPromptMode: SystemPromptMode.Append,
         inheritProjectContext: true,
         interactive: false,
         systemPrompt: "Nested content.",
@@ -191,7 +191,7 @@ describe("Persona Wizard", () => {
         name: "scout",
         description: "Fast codebase recon",
         tools: ["read", "grep", "find", "ls", "bash", "mcp:chrome-devtools"],
-        systemPromptMode: "replace",
+        systemPromptMode: SystemPromptMode.Replace,
         inheritProjectContext: false,
         interactive: true,
         systemPrompt: "You are a fast codebase recon agent.",
@@ -225,7 +225,7 @@ describe("Persona Wizard", () => {
         name: "test-persona-123",
         description: "Special chars test",
         tools: ["read"],
-        systemPromptMode: "replace",
+        systemPromptMode: SystemPromptMode.Replace,
         inheritProjectContext: false,
         interactive: false,
         systemPrompt: "Test.",
@@ -240,7 +240,7 @@ describe("Persona Wizard", () => {
         name: "multiline-test",
         description: "Multiline prompt",
         tools: ["read"],
-        systemPromptMode: "append",
+        systemPromptMode: SystemPromptMode.Append,
         inheritProjectContext: true,
         interactive: false,
         systemPrompt: "Line 1.\nLine 2.\nLine 3.",
