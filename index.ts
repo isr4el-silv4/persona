@@ -11,19 +11,6 @@ import { loadPersona } from "./utils";
 let currentPersona: LoadedPersona | null = null;
 let originalTools: string[] | null = null;
 
-// Safe read-only tools + web search + MCP
-const readerTools = [
-  "read",
-  "grep",
-  "find",
-  "ls",
-  "web_search",
-  "code_search",
-  "fetch_content",
-  "get_search_content",
-  "mcp_adapter",
-];
-
 // Ephemeral personas stored in memory (cleared on session restart)
 const ephemeralPersonas: Map<string, PersonaConfig> = new Map();
 
@@ -64,10 +51,10 @@ export default function (pi: ExtensionAPI) {
 
   // Register /persona command
   pi.registerCommand("persona", {
-    description: "Manage personas — /persona create, /persona list, /persona reader, /persona <name>",
+    description: "Manage personas — /persona create, /persona list, /persona <name>",
     getArgumentCompletions: (prefix: string) => {
       const personas = listPersonas(ephemeralPersonas);
-      const suggestions = ["create", "list", "reader", ...personas.map((p) => `[persona] ${p.name}`)];
+      const suggestions = ["create", "list", ...personas.map((p) => `[persona] ${p.name}`)];
       const filtered = suggestions.filter((s) => s.startsWith(prefix));
       return filtered.map((s) => ({ value: s.replace(/^\[persona\] /, ""), label: s }));
     },
@@ -97,32 +84,7 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      // Handle /persona reader (built-in read-only mode)
-      if (trimmed === "reader") {
-        if (currentPersona?.scope === "reader") {
-          // Deactivate reader
-          if (originalTools) {
-            pi.setActiveTools(originalTools);
-          }
-          currentPersona = null;
-          ctx.ui.notify("Original tools restored", "info");
-        } else {
-          // Activate reader
-          originalTools = pi.getAllTools().map((t) => t.name);
-          currentPersona = { name: "reader", description: "Read-only mode", tools: readerTools, systemPromptMode: "replace", inheritProjectContext: false, interactive: false, systemPrompt: "" } as LoadedPersona;
-          pi.setActiveTools(readerTools);
-          ctx.ui.notify("📖 Reader persona active — read-only tools enabled", "info");
-        }
-        return;
-      }
 
-      // If switching away from reader, restore original tools
-      if (currentPersona?.scope === "reader" && trimmed !== "reader") {
-        if (originalTools) {
-          pi.setActiveTools(originalTools);
-        }
-        currentPersona = null;
-      }
 
       // Handle ephemeral personas
       if (ephemeralPersonas.has(trimmed)) {
@@ -139,10 +101,8 @@ export default function (pi: ExtensionAPI) {
 
       // Clear persona
       if (trimmed === "" || trimmed === "none") {
-        if (currentPersona?.scope === "reader" || (currentPersona && originalTools)) {
-          if (currentPersona?.scope === "reader") {
-            pi.setActiveTools(originalTools);
-          }
+        if (originalTools) {
+          pi.setActiveTools(originalTools);
         }
         currentPersona = null;
         ctx.ui.notify("Persona cleared", "info");
@@ -157,7 +117,6 @@ export default function (pi: ExtensionAPI) {
         const personaTools = loaded.tools.filter((t) => availableToolNames.includes(t));
 
         originalTools = pi.getAllTools().map((t) => t.name);
-        originalSystemPrompt = event?.systemPrompt || null;
 
         if (personaTools.length > 0) {
           pi.setActiveTools(personaTools);
