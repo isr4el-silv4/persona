@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 // These imports will use the mocked module
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { generateYaml, type PersonaConfig, SystemPromptMode, PersonaScope, runPersonaWizard, listPersonas } from "../persona-wizard";
-import { loadPersona } from "../utils";
+import { loadPersona, deletePersona, DeleteScope } from "../utils";
 
 // Mock the UI methods
 const mockInput = jest.fn();
@@ -575,6 +575,109 @@ Test prompt.
 
       expect(result).toBeDefined();
       expect(result?.name).toBe("my test persona");
+    });
+  });
+
+  describe("deletePersona", () => {
+    it("should delete a global persona from ~/.pi/agent/personas/", () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-delete-test-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      const yaml = `---
+name: delete-me
+description: Delete test
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Test prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "delete-me.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      const result = deletePersona("delete-me", DeleteScope.GLOBAL);
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain("Deleted global persona");
+    });
+
+    it("should return failure for non-existent global persona", () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-delete-test-");
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      const result = deletePersona("non-existent", DeleteScope.GLOBAL);
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("not found");
+    });
+
+    it("should delete a project persona from .pi/personas/", () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-delete-test-");
+      const projectDir = path.join(tmpDir, ".pi", "personas");
+      fs.mkdirSync(projectDir, { recursive: true });
+
+      const yaml = `---
+name: project-delete
+description: Project delete test
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Test prompt.
+`;
+      fs.writeFileSync(path.join(projectDir, "project-delete.yaml"), yaml, "utf-8");
+
+      const originalCwd = process.cwd();
+      process.chdir(tmpDir);
+
+      const result = deletePersona("project-delete", DeleteScope.PROJECT);
+
+      process.chdir(originalCwd);
+      fs.rmSync(tmpDir, { recursive: true });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain("Deleted project persona");
+    });
+
+    it("should handle persona names with spaces (sanitized to hyphens)", () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-delete-test-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      const yaml = `---
+name: delete with spaces
+description: Delete test
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Test prompt.
+`;
+      // File saved with hyphens
+      fs.writeFileSync(path.join(globalDir, "delete-with-spaces.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      const result = deletePersona("delete with spaces", DeleteScope.GLOBAL);
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+
+      expect(result.success).toBe(true);
     });
   });
 });

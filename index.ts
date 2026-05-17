@@ -5,7 +5,7 @@ import {
   listPersonas,
   type LoadedPersona,
 } from "./persona-wizard";
-import { loadPersona } from "./utils";
+import { loadPersona, deletePersona, DeleteScope } from "./utils";
 
 // Global state — accessible across all handlers in this extension
 let currentPersona: LoadedPersona | null = null;
@@ -54,7 +54,7 @@ export default function (pi: ExtensionAPI) {
     description: "Manage personas — /persona create, /persona list, /persona <name>",
     getArgumentCompletions: (prefix: string) => {
       const personas = listPersonas(ephemeralPersonas);
-      const suggestions = ["create", "list", ...personas.map((p) => `[persona] ${p.name}`)];
+      const suggestions = ["create", "list", "delete", ...personas.map((p) => `[persona] ${p.name}`)];
       const filtered = suggestions.filter((s) => s.startsWith(prefix));
       return filtered.map((s) => ({ value: s.replace(/^\[persona\] /, ""), label: s }));
     },
@@ -81,6 +81,39 @@ export default function (pi: ExtensionAPI) {
             "Use /persona <name> to activate, /persona none to clear.",
           ]);
         }
+        return;
+      }
+
+      // Handle /persona delete
+      if (trimmed === "delete") {
+        ctx.ui.notify("Usage: /persona delete <persona-name>", "warn");
+        return;
+      }
+
+      // Handle /persona delete <name>
+      if (trimmed.startsWith("delete ")) {
+        const personaName = trimmed.slice(7).trim();
+        if (!personaName) {
+          ctx.ui.notify("Usage: /persona delete <persona-name>", "warn");
+          return;
+        }
+
+        // Check if currently active persona matches
+        if (currentPersona && currentPersona.name === personaName) {
+          currentPersona = null;
+          if (originalTools) {
+            pi.setActiveTools(originalTools);
+          }
+        }
+
+        // Try to delete from global scope
+        let result = deletePersona(personaName, DeleteScope.GLOBAL);
+        if (!result.success) {
+          // Try project scope
+          result = deletePersona(personaName, DeleteScope.PROJECT);
+        }
+
+        ctx.ui.notify(result.message, result.success ? "success" : "error");
         return;
       }
 

@@ -76,3 +76,42 @@ export function loadPersona(name: string): LoadedPersona | null {
 
   return null;
 }
+
+export enum DeleteScope {
+  GLOBAL = "global",
+  PROJECT = "project",
+}
+
+export function deletePersona(name: string, scope: DeleteScope): { success: boolean; message: string } {
+  const safeName = name.toLowerCase().replace(/\s+/g, "-");
+
+  if (scope === DeleteScope.GLOBAL) {
+    const globalDir = path.join(process.env.HOME || "", ".pi", "agent", "personas");
+    const filePath = path.join(globalDir, `${safeName}.yaml`);
+    if (!fs.existsSync(filePath)) {
+      return { success: false, message: `Global persona "${name}" not found.` };
+    }
+    try {
+      fs.unlinkSync(filePath);
+      return { success: true, message: `✅ Deleted global persona "${name}".` };
+    } catch (error: any) {
+      return { success: false, message: `Failed to delete: ${error.message}` };
+    }
+  }
+
+  if (scope === DeleteScope.PROJECT) {
+    const projectDir = path.join(process.cwd(), ".pi", "personas");
+    const filePath = path.join(projectDir, `${safeName}.yaml`);
+    if (!fs.existsSync(filePath)) {
+      return { success: false, message: `Project persona "${name}" not found.` };
+    }
+    try {
+      fs.unlinkSync(filePath);
+      return { success: true, message: `✅ Deleted project persona "${name}".` };
+    } catch (error: any) {
+      return { success: false, message: `Failed to delete: ${error.message}` };
+    }
+  }
+
+  return { success: false, message: `Unknown scope: ${scope}` };
+}
