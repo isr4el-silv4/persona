@@ -43,8 +43,18 @@ export const Key: {
   ctrl: (letter: string): string => `ctrl(${letter})`,
 };
 
-export const truncateToWidth = (str: string, _width: number, _ellipsis?: string): string => str;
-export const visibleWidth = (str: string): number => str.length;
+export const truncateToWidth = (str: string, width: number, ellipsis = "..."): string => {
+  if (visibleWidth(str) <= width) return str;
+  const ellipsisWidth = visibleWidth(ellipsis);
+  const truncated = str.slice(0, width - ellipsisWidth);
+  return truncated + ellipsis;
+};
+
+export const visibleWidth = (str: string): number => {
+  // Remove ANSI escape codes before counting
+  const cleaned = str.replace(/\x1b\[[0-9;]*m/g, "");
+  return cleaned.length;
+};
 export const CURSOR_MARKER = "";
 
 // Dummy implementations for test purposes

@@ -6,6 +6,7 @@ import {
   type LoadedPersona,
 } from "./persona-wizard";
 import { loadPersona, deletePersona, DeleteScope } from "./utils";
+import { PersonaIndicator } from "./persona-indicator";
 
 // Global state — accessible across all handlers in this extension
 let currentPersona: LoadedPersona | null = null;
@@ -27,11 +28,21 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
-    ctx.ui.setWidget("persona", [
-      "👋 before_agent_start fired!",
-      `Prompt: ${event.prompt}`,
-      `Current persona: ${currentPersona?.name || "none"}`,
-    ]);
+    ctx.ui.setWidget("persona", (_tui, theme) => {
+      const indicator = new PersonaIndicator(currentPersona);
+      const lines = indicator.render(80);
+
+      if (lines.length === 0) {
+        return { render: () => [], invalidate: () => {} };
+      }
+
+      return {
+        render: () => lines,
+        invalidate: () => {
+          indicator.invalidate();
+        },
+      };
+    });
 
     // Inject persona system prompt if active
     if (currentPersona) {
@@ -46,7 +57,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_provider_request", async (event, _ctx) => {
-    // console.log(JSON.stringify(event.payload, null, 2)); only uncomment when debugging
+    console.log(JSON.stringify(event.payload, null, 2)); // only uncomment when debugging
   });
 
   // Register /persona command
