@@ -16,10 +16,6 @@ let originalTools: string[] | null = null;
 const ephemeralPersonas: Map<string, PersonaConfig> = new Map();
 
 export default function (pi: ExtensionAPI) {
-  pi.on("session_start", async (_event, ctx) => {
-    ctx.ui.notify("Hello, World! Persona extension is active.", "info");
-  });
-
   pi.on("session_shutdown", async (event, _ctx) => {
     // Clear ephemeral personas on session restart
     if (event.reason === "new" || event.reason === "resume" || event.reason === "fork") {
