@@ -181,11 +181,11 @@ describe("Persona Wizard", () => {
       mockInput.mockResolvedValueOnce("scout"); // name
       mockInput.mockResolvedValueOnce("Fast codebase recon"); // description
       mockInput.mockResolvedValueOnce("read, grep, find, ls, bash, mcp:chrome-devtools"); // tools
-      mockSelect.mockResolvedValueOnce(0); // systemPromptMode: replace (index 0)
+      mockSelect.mockResolvedValueOnce("Replace — overwrite the entire system prompt"); // systemPromptMode: replace
       mockConfirm.mockResolvedValueOnce(false); // inheritProjectContext
       mockConfirm.mockResolvedValueOnce(true); // interactive
       mockInput.mockResolvedValueOnce("You are a fast codebase recon agent."); // systemPrompt
-      mockSelect.mockResolvedValueOnce(0); // scope: global (index 0)
+      mockSelect.mockResolvedValueOnce("Global (~/.pi/agent/personas/)"); // scope: global
 
       const config: PersonaConfig = {
         name: "scout",

@@ -56,8 +56,9 @@ async function askSelect(
   const c = ensureCtx(ctx);
   const labels = options.map((o) => o.label);
   const result = await c.ui.select(prompt, labels);
-  if (result === null || result < 0) return null;
-  return options[result].value;
+  if (result === null || result === undefined) return null;
+  const found = options.find((o) => o.label === result);
+  return found ? found.value : null;
 }
 
 async function askConfirm(ctx: ExtensionContext, prompt: string): Promise<boolean> {
