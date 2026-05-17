@@ -3,9 +3,9 @@ import {
   runPersonaWizard,
   type PersonaConfig,
   listPersonas,
-  loadPersona,
   type LoadedPersona,
 } from "./persona-wizard";
+import { loadPersona } from "./utils";
 
 // Global state — accessible across all handlers in this extension
 let currentPersona: LoadedPersona | null = null;
@@ -67,9 +67,9 @@ export default function (pi: ExtensionAPI) {
     description: "Manage personas — /persona create, /persona list, /persona reader, /persona <name>",
     getArgumentCompletions: (prefix: string) => {
       const personas = listPersonas(ephemeralPersonas);
-      const suggestions = ["create", "list", "reader", ...personas.map((p) => p.name)];
+      const suggestions = ["create", "list", "reader", ...personas.map((p) => `[persona] ${p.name}`)];
       const filtered = suggestions.filter((s) => s.startsWith(prefix));
-      return filtered.map((s) => ({ value: s, label: s }));
+      return filtered.map((s) => ({ value: s.replace(/^\[persona\] /, ""), label: s }));
     },
     handler: async (args, ctx) => {
       const trimmed = args?.trim() || "";
