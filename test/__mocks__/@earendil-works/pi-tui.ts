@@ -1,12 +1,41 @@
 // Manual mock for @earendil-works/pi-tui
+export interface Component {
+  render(width: number): string[];
+  handleInput?(data: string): void;
+  invalidate(): void;
+}
+
 export const matchesKey = (data: string, key: string): boolean => {
   if (key === " ") return data === " " || data === "space";
   if (key === "enter") return data === "enter" || data === "\r";
   if (key === "escape") return data === "escape" || data === "\x1b";
+  if (key === "ctrl(a)") return data === "ctrl+a" || data === "\x01";
   return data === key;
 };
 
-export const Key = {
+// Key constants (mirrors @earendil-works/pi-tui)
+export const KEY_UP = "up";
+export const KEY_DOWN = "down";
+export const KEY_SPACE = " ";
+export const KEY_ENTER = "enter";
+export const KEY_ESCAPE = "escape";
+export const KEY_CTRL_A = "ctrl(a)";
+
+export const Key: {
+  readonly up: string;
+  readonly down: string;
+  readonly left: string;
+  readonly right: string;
+  readonly enter: string;
+  readonly escape: string;
+  readonly space: string;
+  readonly backspace: string;
+  readonly delete: string;
+  readonly tab: string;
+  readonly home: string;
+  readonly end: string;
+  readonly ctrl: (letter: string) => string;
+} = {
   up: "up",
   down: "down",
   left: "left",
@@ -19,7 +48,8 @@ export const Key = {
   tab: "tab",
   home: "home",
   end: "end",
-} as const;
+  ctrl: (letter: string): string => `ctrl(${letter})`,
+};
 
 export const truncateToWidth = (str: string, _width: number, _ellipsis?: string): string => str;
 export const visibleWidth = (str: string): number => str.length;
@@ -57,15 +87,17 @@ export class Box {
 }
 
 export class Container {
-  private children: any[] = [];
+  private children: Component[] = [];
   render(_width: number): string[] {
-    return [];
+    return this.children.flatMap((c) => c.render(_width));
   }
-  invalidate(): void {}
-  addChild(component: any): void {
+  invalidate(): void {
+    this.children.forEach((c) => c.invalidate());
+  }
+  addChild(component: Component): void {
     this.children.push(component);
   }
-  removeChild(component: any): void {
+  removeChild(component: Component): void {
     this.children = this.children.filter((c) => c !== component);
   }
   clear(): void {

@@ -1,9 +1,16 @@
 import {
   matchesKey,
-  Key,
   truncateToWidth,
   type Component,
 } from "@earendil-works/pi-tui";
+
+// Key constants (mirrors @earendil-works/pi-tui)
+const KEY_UP = "up";
+const KEY_DOWN = "down";
+const KEY_SPACE = " ";
+const KEY_ENTER = "enter";
+const KEY_ESCAPE = "escape";
+const KEY_CTRL_A = "ctrl(a)";
 
 export interface MultiSelectItem {
   value: string;
@@ -49,16 +56,16 @@ export class MultiSelectList implements Component {
   }
 
   handleInput(data: string): void {
-    if (matchesKey(data, Key.up) && this.highlighted > 0) {
+    if (matchesKey(data, KEY_UP) && this.highlighted > 0) {
       this.highlighted--;
       this.invalidate();
     } else if (
-      matchesKey(data, Key.down) &&
+      matchesKey(data, KEY_DOWN) &&
       this.highlighted < this.items.length - 1
     ) {
       this.highlighted++;
       this.invalidate();
-    } else if (matchesKey(data, Key.space)) {
+    } else if (matchesKey(data, KEY_SPACE)) {
       const item = this.items[this.highlighted];
       if (item) {
         if (this.selected.has(item.value)) {
@@ -68,9 +75,18 @@ export class MultiSelectList implements Component {
         }
         this.invalidate();
       }
-    } else if (matchesKey(data, Key.enter)) {
+    } else if (matchesKey(data, KEY_CTRL_A)) {
+      // Ctrl+A: select/deselect all
+      const allSelected = this.items.every((item) => this.selected.has(item.value));
+      if (allSelected) {
+        this.selected.clear();
+      } else {
+        this.items.forEach((item) => this.selected.add(item.value));
+      }
+      this.invalidate();
+    } else if (matchesKey(data, KEY_ENTER)) {
       this.onSelect?.();
-    } else if (matchesKey(data, Key.escape)) {
+    } else if (matchesKey(data, KEY_ESCAPE)) {
       this.onCancel?.();
     }
   }

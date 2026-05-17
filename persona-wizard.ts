@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { MultiSelectList, type MultiSelectItem } from "./multi-select-list";
+import { Container, Text, type Component } from "@earendil-works/pi-tui";
 
 export enum SystemPromptMode {
   REPLACE = "replace",
@@ -96,7 +97,18 @@ async function askToolsSelect(pi: ExtensionAPI, ctx: ExtensionContext): Promise<
     // Override the default selected set
     multiSelect.selected = selected;
 
-    c.ui.custom((tui: any, _theme: any, _kb: any, done: (result: any) => void) => {
+    const helpText = "↑↓ navigate • space toggle • ctrl+a select all • enter continue • esc cancel";
+
+    c.ui.custom((tui: any, theme: any, _kb: any, done: (result: any) => void) => {
+      const container = new Container();
+
+      // Title
+      container.addChild(new Text(theme.fg("accent", "Select tools for this persona"), 1, 0));
+      container.addChild(new Text(theme.fg("dim", helpText), 1, 0));
+
+      // Multi-select list
+      container.addChild(multiSelect);
+
       multiSelect.onSelect = () => {
         const values = multiSelect.getSelectedValues();
         done(null);
@@ -107,7 +119,15 @@ async function askToolsSelect(pi: ExtensionAPI, ctx: ExtensionContext): Promise<
         done(null);
         resolve(values);
       };
-      return multiSelect;
+
+      return {
+        render: (width: number) => container.render(width),
+        invalidate: () => container.invalidate(),
+        handleInput: (data: string) => {
+          multiSelect.handleInput?.(data);
+          tui.requestRender();
+        },
+      };
     });
   });
 }

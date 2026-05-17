@@ -114,6 +114,26 @@ describe("MultiSelectList", () => {
     expect(called).toBe(true);
   });
 
+  it("should select all with ctrl+a", () => {
+    const list = new MultiSelectList(items, 5);
+    list.handleInput?.("ctrl+a");
+    const values = list.getSelectedValues();
+    expect(values).toHaveLength(5);
+    expect(values).toContain("read");
+    expect(values).toContain("grep");
+    expect(values).toContain("find");
+    expect(values).toContain("ls");
+    expect(values).toContain("bash");
+  });
+
+  it("should deselect all with ctrl+a when all selected", () => {
+    const list = new MultiSelectList(items, 5);
+    list.handleInput?.("ctrl+a"); // select all
+    list.handleInput?.("ctrl+a"); // deselect all
+    const values = list.getSelectedValues();
+    expect(values).toHaveLength(0);
+  });
+
   it("should invalidate clear cache", () => {
     const list = new MultiSelectList(items, 5);
     list.render(80);

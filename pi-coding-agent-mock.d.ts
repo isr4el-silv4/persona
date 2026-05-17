@@ -7,7 +7,7 @@ declare module "@earendil-works/pi-coding-agent" {
 // Type declarations for @earendil-works/pi-tui (mock for testing)
 declare module "@earendil-works/pi-tui" {
   export const matchesKey: (data: string, key: string) => boolean;
-  export const Key: Record<string, string>;
+  export const Key: any;
   export const truncateToWidth: (str: string, width: number, ellipsis?: string) => string;
   export const visibleWidth: (str: string) => number;
   export const CURSOR_MARKER: string;
