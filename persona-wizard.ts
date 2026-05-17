@@ -35,6 +35,11 @@ export interface PersonaListItem {
   scope: "global" | "project" | "ephemeral";
 }
 
+export interface LoadedPersona extends PersonaConfig {
+  scope: "global" | "project" | "ephemeral";
+  filePath?: string;
+}
+
 function parseYamlFrontmatter(content: string): Partial<PersonaConfig> {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
   if (!match) return {};
@@ -45,11 +50,70 @@ function parseYamlFrontmatter(content: string): Partial<PersonaConfig> {
     const colonIndex = line.indexOf(":");
     if (colonIndex === -1) continue;
     const key = line.slice(0, colonIndex).trim();
-    const value = line.slice(colonIndex + 1).trim();
+    let value = line.slice(colonIndex + 1).trim();
+    // Parse tools as comma-separated list
+    if (key === "tools") {
+      result.tools = value.split(",").map((t: string) => t.trim());
+      continue;
+    }
+    // Parse booleans
+    if (key === "inheritProjectContext") {
+      result.inheritProjectContext = value === "true";
+      continue;
+    }
+    if (key === "interactive") {
+      result.interactive = value === "true";
+      continue;
+    }
     if (key === "name") result.name = value;
     else if (key === "description") result.description = value;
+    else if (key === "systemPromptMode") result.systemPromptMode = value as SystemPromptMode;
+  }
+  // Extract system prompt (everything after the second ---)
+  const systemPromptMatch = content.match(/^---\s*\n[\s\S]*?\n---\s*\n([\s\S]*)$/);
+  if (systemPromptMatch) {
+    result.systemPrompt = systemPromptMatch[1].trim();
   }
   return result;
+}
+
+export function loadPersona(name: string): LoadedPersona | null {
+  const safeName = name.toLowerCase().replace(/\s+/g, "-");
+
+  // Check ephemeral personas (passed as parameter)
+  // This is handled externally since ephemeral personas are in-memory
+
+  // Check global personas
+  const globalDir = path.join(process.env.HOME || "", ".pi", "agent", "personas");
+  const globalPath = path.join(globalDir, `${safeName}.yaml`);
+  if (fs.existsSync(globalPath)) {
+    const content = fs.readFileSync(globalPath, "utf-8");
+    const parsed = parseYamlFrontmatter(content);
+    if (parsed.name) {
+      return {
+        ...parsed,
+        scope: "global",
+        filePath: globalPath,
+      } as LoadedPersona;
+    }
+  }
+
+  // Check project personas
+  const projectDir = path.join(process.cwd(), ".pi", "personas");
+  const projectPath = path.join(projectDir, `${safeName}.yaml`);
+  if (fs.existsSync(projectPath)) {
+    const content = fs.readFileSync(projectPath, "utf-8");
+    const parsed = parseYamlFrontmatter(content);
+    if (parsed.name) {
+      return {
+        ...parsed,
+        scope: "project",
+        filePath: projectPath,
+      } as LoadedPersona;
+    }
+  }
+
+  return null;
 }
 
 export function listPersonas(ephemeral: Map<string, PersonaConfig>): PersonaListItem[] {

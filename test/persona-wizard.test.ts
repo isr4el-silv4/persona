@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 
 // These imports will use the mocked module
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { generateYaml, type PersonaConfig, SystemPromptMode, PersonaScope, runPersonaWizard, listPersonas } from "../persona-wizard";
+import { generateYaml, type PersonaConfig, SystemPromptMode, PersonaScope, runPersonaWizard, listPersonas, loadPersona } from "../persona-wizard";
 
 // Mock the UI methods
 const mockInput = jest.fn();
@@ -459,6 +459,121 @@ You are a project scout.
       expect(projectPersona).toBeDefined();
       expect(projectPersona?.scope).toBe("project");
       expect(projectPersona?.description).toBe("Project-specific scout");
+    });
+  });
+
+  describe("loadPersona", () => {
+    it("should load a global persona from YAML file", () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-load-test-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      const yaml = `---
+name: test-scoped
+description: Test scoped persona
+tools: read, grep, find
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+You are a test persona.
+`;
+      fs.writeFileSync(path.join(globalDir, "test-scoped.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      const result = loadPersona("test-scoped");
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+
+      expect(result).toBeDefined();
+      expect(result?.name).toBe("test-scoped");
+      expect(result?.description).toBe("Test scoped persona");
+      expect(result?.scope).toBe("global");
+      expect(result?.tools).toEqual(["read", "grep", "find"]);
+      expect(result?.systemPrompt).toBe("You are a test persona.");
+      expect(result?.systemPromptMode).toBe("replace");
+    });
+
+    it("should return null for non-existent persona", () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-load-test-");
+      const originalHome = process.env.HOME;
+      const originalCwd = process.cwd();
+      process.env.HOME = tmpDir;
+      process.chdir(tmpDir);
+
+      const result = loadPersona("non-existent");
+
+      process.env.HOME = originalHome;
+      process.chdir(originalCwd);
+      fs.rmSync(tmpDir, { recursive: true });
+
+      expect(result).toBeNull();
+    });
+
+    it("should load a project persona", () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-load-test-");
+      const projectDir = path.join(tmpDir, ".pi", "personas");
+      fs.mkdirSync(projectDir, { recursive: true });
+
+      const yaml = `---
+name: project-dev
+description: Project developer
+tools: read, grep, bash
+systemPromptMode: append
+inheritProjectContext: true
+interactive: true
+---
+You are a project developer.
+`;
+      fs.writeFileSync(path.join(projectDir, "project-dev.yaml"), yaml, "utf-8");
+
+      const originalCwd = process.cwd();
+      process.chdir(tmpDir);
+
+      const result = loadPersona("project-dev");
+
+      process.chdir(originalCwd);
+      fs.rmSync(tmpDir, { recursive: true });
+
+      expect(result).toBeDefined();
+      expect(result?.name).toBe("project-dev");
+      expect(result?.scope).toBe("project");
+      expect(result?.systemPromptMode).toBe("append");
+      expect(result?.inheritProjectContext).toBe(true);
+    });
+
+    it("should handle persona names with spaces (sanitized to hyphens)", () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-load-test-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      // File is saved with hyphens
+      const yaml = `---
+name: my test persona
+description: Test
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Test prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "my-test-persona.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      // Should load when searching with spaces
+      const result = loadPersona("my test persona");
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+
+      expect(result).toBeDefined();
+      expect(result?.name).toBe("my test persona");
     });
   });
 });
