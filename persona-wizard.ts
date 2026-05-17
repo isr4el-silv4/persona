@@ -27,24 +27,41 @@ const SYSTEM_PROMPT_MODES = [
   { value: "append" as const, label: "Append — add to the end of the system prompt" },
 ] as const;
 
-async function askInput(prompt: string, ctx: ExtensionContext, defaultValue?: string): Promise<string | null> {
-  const result = await ctx.ui.input(prompt, defaultValue);
+function ensureCtx(ctx: ExtensionContext | undefined): ExtensionContext {
+  if (!ctx) {
+    throw new Error("Extension context is undefined. This may occur in non-interactive modes.");
+  }
+  if (!ctx.ui) {
+    throw new Error("UI is not available in this mode (print/JSON mode). Use interactive mode.");
+  }
+  return ctx;
+}
+
+async function askInput(ctx: ExtensionContext, prompt: string, defaultValue?: string): Promise<string | null> {
+  const c = ensureCtx(ctx);
+  const result = await c.ui.input(prompt, defaultValue);
   return result;
 }
 
-async function askSelect(prompt: string, options: Array<{ value: string; label: string }>, ctx: ExtensionContext): Promise<string | null> {
+async function askSelect(
+  ctx: ExtensionContext,
+  prompt: string,
+  options: Array<{ value: string; label: string }>
+): Promise<string | null> {
+  const c = ensureCtx(ctx);
   const labels = options.map((o) => o.label);
-  const result = await ctx.ui.select(prompt, labels);
+  const result = await c.ui.select(prompt, labels);
   if (result === null || result < 0) return null;
   return options[result].value;
 }
 
-async function askConfirm(prompt: string, ctx: ExtensionContext): Promise<boolean> {
-  const result = await ctx.ui.confirm("Persona Wizard", prompt);
+async function askConfirm(ctx: ExtensionContext, prompt: string): Promise<boolean> {
+  const c = ensureCtx(ctx);
+  const result = await c.ui.confirm("Persona Wizard", prompt);
   return result;
 }
 
-function generateYaml(config: PersonaConfig): string {
+export function generateYaml(config: PersonaConfig): string {
   const toolsStr = config.tools.join(", ");
   return `---
 name: ${config.name}
@@ -68,94 +85,82 @@ function getPersonaFilePath(scope: string, name: string): string | null {
 }
 
 export async function runPersonaWizard(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
-  // Step 1: Name
-  const name = await askInput("Persona name:", ctx);
-  if (!name) return ctx.ui.notify("Wizard cancelled.", "info");
+  // Validate context upfront
+  ensureCtx(ctx);
 
-  // Step 2: Description
-  const description = await askInput(`Description for "${name}" (e.g., "Fast codebase recon"):`);
-  if (!description) return ctx.ui.notify("Wizard cancelled.", "info");
-
-  // Step 3: Tools
-  const toolsInput = await askInput(
-    "Tools (comma-separated, e.g., 'read, grep, find, ls, bash, mcp:chrome-devtools'):",
-    ctx,
-    "read, grep, find, ls"
-  );
-  if (!toolsInput) return ctx.ui.notify("Wizard cancelled.", "info");
-  const tools = toolsInput.split(",").map((t) => t.trim()).filter(Boolean);
-
-  // Step 4: System prompt mode
-  const systemPromptMode = await askSelect(
-    "System prompt mode:",
-    SYSTEM_PROMPT_MODES,
-    ctx
-  );
-  if (!systemPromptMode) return ctx.ui.notify("Wizard cancelled.", "info");
-
-  // Step 5: Inherit project context
-  const inheritProjectContext = await askConfirm(
-    "Inherit project context (AGENTS.md files)?",
-    ctx
-  );
-
-  // Step 6: Interactive
-  const interactive = await askConfirm(
-    "Is this persona interactive (can prompt the user)?",
-    ctx
-  );
-
-  // Step 7: System prompt
-  const systemPrompt = await askInput(
-    "System prompt (press Enter when done):\n",
-    ctx
-  );
-  if (systemPrompt === null) return ctx.ui.notify("Wizard cancelled.", "info");
-
-  // Step 8: Scope
-  const scope = await askSelect(
-    "Persona scope:",
-    SCOPES,
-    ctx
-  );
-  if (!scope) return ctx.ui.notify("Wizard cancelled.", "info");
-
-  // Build config
-  const config: PersonaConfig = {
-    name,
-    description,
-    tools,
-    systemPromptMode: systemPromptMode as "replace" | "append",
-    inheritProjectContext,
-    interactive,
-    systemPrompt,
-  };
-
-  // Handle ephemeral
-  if (scope === "ephemeral") {
-    // Store in memory using pi.appendEntry for persistence across reloads
-    // but it will be cleared on session restart (as requested)
-    const entryId = pi.appendEntry("ephemeral-persona", config);
-    ctx.ui.notify(`✨ Ephemeral persona "${name}" created (in-memory only)`, "success");
-    return;
-  }
-
-  // Handle file-based personas
-  const filePath = getPersonaFilePath(scope, name);
-  if (!filePath) return;
-
-  const yaml = generateYaml(config);
-
-  // Ensure directory exists
-  const resolvedPath = filePath.replace("~", process.env.HOME || "");
-  const dir = path.dirname(resolvedPath);
-  fs.mkdirSync(dir, { recursive: true });
-
-  // Write the file
   try {
-    fs.writeFileSync(resolvedPath, yaml, "utf-8");
-    ctx.ui.notify(`✨ Persona "${name}" created at ${filePath}`, "success");
+    // Step 1: Name
+    const name = await askInput(ctx, "Persona name:");
+    if (!name) return ctx.ui.notify("Wizard cancelled.", "info");
+
+    // Step 2: Description
+    const description = await askInput(ctx, `Description for "${name}" (e.g., "Fast codebase recon"):`);
+    if (!description) return ctx.ui.notify("Wizard cancelled.", "info");
+
+    // Step 3: Tools
+    const toolsInput = await askInput(
+      ctx,
+      "Tools (comma-separated, e.g., 'read, grep, find, ls, bash, mcp:chrome-devtools'):",
+      "read, grep, find, ls"
+    );
+    if (!toolsInput) return ctx.ui.notify("Wizard cancelled.", "info");
+    const tools = toolsInput.split(",").map((t) => t.trim()).filter(Boolean);
+
+    // Step 4: System prompt mode
+    const systemPromptMode = await askSelect(ctx, "System prompt mode:", SYSTEM_PROMPT_MODES);
+    if (!systemPromptMode) return ctx.ui.notify("Wizard cancelled.", "info");
+
+    // Step 5: Inherit project context
+    const inheritProjectContext = await askConfirm(ctx, "Inherit project context (AGENTS.md files)?");
+
+    // Step 6: Interactive
+    const interactive = await askConfirm(ctx, "Is this persona interactive (can prompt the user)?");
+
+    // Step 7: System prompt
+    const systemPrompt = await askInput(ctx, "System prompt (press Enter when done):\n");
+    if (systemPrompt === null) return ctx.ui.notify("Wizard cancelled.", "info");
+
+    // Step 8: Scope
+    const scope = await askSelect(ctx, "Persona scope:", SCOPES);
+    if (!scope) return ctx.ui.notify("Wizard cancelled.", "info");
+
+    // Build config
+    const config: PersonaConfig = {
+      name,
+      description,
+      tools,
+      systemPromptMode: systemPromptMode as "replace" | "append",
+      inheritProjectContext,
+      interactive,
+      systemPrompt,
+    };
+
+    // Handle ephemeral
+    if (scope === "ephemeral") {
+      pi.appendEntry("ephemeral-persona", config);
+      ctx.ui.notify(`✨ Ephemeral persona "${name}" created (in-memory only)`, "success");
+      return;
+    }
+
+    // Handle file-based personas
+    const filePath = getPersonaFilePath(scope, name);
+    if (!filePath) return;
+
+    const yaml = generateYaml(config);
+
+    // Ensure directory exists
+    const resolvedPath = filePath.replace("~", process.env.HOME || "");
+    const dir = path.dirname(resolvedPath);
+    fs.mkdirSync(dir, { recursive: true });
+
+    // Write the file
+    try {
+      fs.writeFileSync(resolvedPath, yaml, "utf-8");
+      ctx.ui.notify(`✨ Persona "${name}" created at ${filePath}`, "success");
+    } catch (error: any) {
+      ctx.ui.notify(`Failed to save persona: ${error.message}`, "error");
+    }
   } catch (error: any) {
-    ctx.ui.notify(`Failed to save persona: ${error.message}`, "error");
+    ctx.ui.notify(`Wizard error: ${error.message}`, "error");
   }
 }
