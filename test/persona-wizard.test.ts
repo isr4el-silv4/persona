@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 
 // These imports will use the mocked module
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { generateYaml, type PersonaConfig } from "./persona-wizard";
+import { generateYaml, type PersonaConfig } from "../persona-wizard";
 
 // Mock the UI methods
 const mockInput = jest.fn();
