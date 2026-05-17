@@ -54,6 +54,15 @@ export default function (pi: ExtensionAPI) {
     description: "Manage personas — /persona create, /persona list, /persona <name>",
     getArgumentCompletions: (prefix: string) => {
       const personas = listPersonas(ephemeralPersonas);
+
+      // If prefix starts with "delete ", show persona options for deletion
+      if (prefix.startsWith("delete ")) {
+        const search = prefix.slice(7).trim();
+        const filtered = personas.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+        return filtered.map((p) => ({ value: p.name, label: p.name }));
+      }
+
+      // Otherwise show command suggestions + personas
       const suggestions = ["create", "list", "delete", ...personas.map((p) => `[persona] ${p.name}`)];
       const filtered = suggestions.filter((s) => s.startsWith(prefix));
       return filtered.map((s) => ({ value: s.replace(/^\[persona\] /, ""), label: s }));
