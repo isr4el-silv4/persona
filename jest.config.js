@@ -5,6 +5,9 @@ module.exports = {
   moduleNameMapper: {},
   roots: ['<rootDir>'],
   testMatch: ['<rootDir>/test/**/*.test.ts'],
+  moduleNameMapper: {
+    '^@earendil-works/pi-coding-agent$': '<rootDir>/test/__mocks__/@earendil-works/pi-coding-agent.ts',
+  },
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',
