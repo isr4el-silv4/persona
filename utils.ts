@@ -82,6 +82,19 @@ export enum DeleteScope {
   PROJECT = "project",
 }
 
+export function getScopeEmoji(scope: string): string {
+  switch (scope) {
+    case "global":
+      return "🌍";
+    case "project":
+      return "📁";
+    case "ephemeral":
+      return "⚡";
+    default:
+      return "🎭";
+  }
+}
+
 export function deletePersona(name: string, scope: DeleteScope): { success: boolean; message: string } {
   const safeName = name.toLowerCase().replace(/\s+/g, "-");
 

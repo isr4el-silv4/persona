@@ -5,7 +5,7 @@ import {
   listPersonas,
   type LoadedPersona,
 } from "./persona-wizard";
-import { loadPersona, deletePersona, DeleteScope } from "./utils";
+import { loadPersona, deletePersona, DeleteScope, getScopeEmoji } from "./utils";
 import { PersonaIndicator } from "./persona-indicator";
 
 // Global state — accessible across all handlers in this extension
@@ -14,19 +14,6 @@ let originalTools: string[] | null = null;
 
 // Ephemeral personas stored in memory (cleared on session restart)
 const ephemeralPersonas: Map<string, PersonaConfig> = new Map();
-
-function getScopeEmoji(scope: string): string {
-  switch (scope) {
-    case "global":
-      return "🌍";
-    case "project":
-      return "📁";
-    case "ephemeral":
-      return "⚡";
-    default:
-      return "🎭";
-  }
-}
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
