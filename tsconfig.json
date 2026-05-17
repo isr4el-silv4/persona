@@ -16,6 +16,6 @@
     "sourceMap": true,
     "types": ["jest", "node"]
   },
-  "include": ["**/*.ts", "test/__mocks__/types.d.ts"],
+  "include": ["**/*.ts", "test/__mocks__/@earendil-works/types.d.ts"],
   "exclude": ["node_modules", "dist"]
 }
