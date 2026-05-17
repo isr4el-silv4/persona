@@ -1,65 +1,59 @@
+// Mock must be at the very top, before any other imports
+jest.mock("@earendil-works/pi-coding-agent", () => ({}));
+
 import fs from "node:fs";
 import path from "node:path";
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 
-// Mock the ExtensionAPI and ExtensionContext for testing
-interface MockUI {
-  input: jest.Mock;
-  select: jest.Mock;
-  confirm: jest.Mock;
-  notify: jest.Mock;
-  setWidget: jest.Mock;
-}
-
-interface MockExtensionContext {
-  ui: MockUI;
-  cwd: string;
-  signal: AbortSignal | undefined;
-}
-
-interface MockExtensionAPI {
-  appendEntry: jest.Mock;
-  getAllTools: jest.Mock;
-  setActiveTools: jest.Mock;
-}
-
-// Import the wizard functions (we'll test the logic directly)
+// These imports will use the mocked module
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { generateYaml, type PersonaConfig } from "./persona-wizard";
+
+// Mock the UI methods
+const mockInput = jest.fn();
+const mockSelect = jest.fn();
+const mockConfirm = jest.fn();
+const mockNotify = jest.fn();
+const mockSetWidget = jest.fn();
+
+// Mock the extension context
+const mockCtx = {
+  ui: {
+    input: (...args: any[]) => mockInput(...args),
+    select: (...args: any[]) => mockSelect(...args),
+    confirm: (...args: any[]) => mockConfirm(...args),
+    notify: (...args: any[]) => mockNotify(...args),
+    setWidget: (...args: any[]) => mockSetWidget(...args),
+  },
+  cwd: "/tmp/test",
+  signal: undefined,
+} as unknown as ExtensionContext;
+
+// Mock the extension API
+const mockPi = {
+  appendEntry: jest.fn(),
+  getAllTools: jest.fn(() => [
+    { name: "read" },
+    { name: "bash" },
+    { name: "edit" },
+    { name: "write" },
+  ]),
+  setActiveTools: jest.fn(),
+} as unknown as ExtensionAPI;
 
 describe("Persona Wizard", () => {
   let tmpDir: string;
-  let mockUI: MockUI;
-  let mockCtx: MockExtensionContext;
-  let mockPi: MockExtensionAPI;
 
   beforeEach(() => {
     // Create a temporary directory for test files
     tmpDir = fs.mkdtempSync("/tmp/persona-test-");
 
-    mockUI = {
-      input: jest.fn(),
-      select: jest.fn(),
-      confirm: jest.fn(),
-      notify: jest.fn(),
-      setWidget: jest.fn(),
-    };
-
-    mockCtx = {
-      ui: mockUI,
-      cwd: tmpDir,
-      signal: undefined,
-    };
-
-    mockPi = {
-      appendEntry: jest.fn(),
-      getAllTools: jest.fn(() => [
-        { name: "read" },
-        { name: "bash" },
-        { name: "edit" },
-        { name: "write" },
-      ]),
-      setActiveTools: jest.fn(),
-    };
+    // Reset mocks
+    mockInput.mockReset();
+    mockSelect.mockReset();
+    mockConfirm.mockReset();
+    mockNotify.mockReset();
+    mockSetWidget.mockReset();
   });
 
   afterEach(() => {
@@ -184,14 +178,14 @@ describe("Persona Wizard", () => {
 
     it("should follow the complete wizard flow and verify file creation", () => {
       // Simulate the complete wizard flow with mocked UI
-      mockUI.input.mockResolvedValueOnce("scout"); // name
-      mockUI.input.mockResolvedValueOnce("Fast codebase recon"); // description
-      mockUI.input.mockResolvedValueOnce("read, grep, find, ls, bash, mcp:chrome-devtools"); // tools
-      mockUI.select.mockResolvedValueOnce(0); // systemPromptMode: replace (index 0)
-      mockUI.confirm.mockResolvedValueOnce(false); // inheritProjectContext
-      mockUI.confirm.mockResolvedValueOnce(true); // interactive
-      mockUI.input.mockResolvedValueOnce("You are a fast codebase recon agent."); // systemPrompt
-      mockUI.select.mockResolvedValueOnce(0); // scope: global (index 0)
+      mockInput.mockResolvedValueOnce("scout"); // name
+      mockInput.mockResolvedValueOnce("Fast codebase recon"); // description
+      mockInput.mockResolvedValueOnce("read, grep, find, ls, bash, mcp:chrome-devtools"); // tools
+      mockSelect.mockResolvedValueOnce(0); // systemPromptMode: replace (index 0)
+      mockConfirm.mockResolvedValueOnce(false); // inheritProjectContext
+      mockConfirm.mockResolvedValueOnce(true); // interactive
+      mockInput.mockResolvedValueOnce("You are a fast codebase recon agent."); // systemPrompt
+      mockSelect.mockResolvedValueOnce(0); // scope: global (index 0)
 
       const config: PersonaConfig = {
         name: "scout",

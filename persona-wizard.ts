@@ -16,15 +16,20 @@ export interface EphemeralPersona {
   config: PersonaConfig;
 }
 
-const SCOPES = [
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+const SCOPES: readonly SelectOption[] = [
   { value: "global", label: "Global (~/.pi/agent/personas/)" },
   { value: "project", label: "Project (.pi/personas/)" },
   { value: "ephemeral", label: "Ephemeral (in-memory, cleared on session restart)" },
 ] as const;
 
-const SYSTEM_PROMPT_MODES = [
-  { value: "replace" as const, label: "Replace — overwrite the entire system prompt" },
-  { value: "append" as const, label: "Append — add to the end of the system prompt" },
+const SYSTEM_PROMPT_MODES: readonly SelectOption[] = [
+  { value: "replace", label: "Replace — overwrite the entire system prompt" },
+  { value: "append", label: "Append — add to the end of the system prompt" },
 ] as const;
 
 function ensureCtx(ctx: ExtensionContext | undefined): ExtensionContext {
@@ -46,7 +51,7 @@ async function askInput(ctx: ExtensionContext, prompt: string, defaultValue?: st
 async function askSelect(
   ctx: ExtensionContext,
   prompt: string,
-  options: Array<{ value: string; label: string }>
+  options: readonly SelectOption[]
 ): Promise<string | null> {
   const c = ensureCtx(ctx);
   const labels = options.map((o) => o.label);
