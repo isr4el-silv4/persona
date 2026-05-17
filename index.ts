@@ -1,15 +1,36 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { runPersonaWizard, type PersonaConfig } from "./persona-wizard";
 
 // Global state — accessible across all handlers in this extension
 let currentPersona: string | null = null;
 let originalTools: string[] | null = null;
 
 // Safe read-only tools + web search + MCP
-const readerTools = ["read", "grep", "find", "ls", "web_search", "code_search", "fetch_content", "get_search_content", "mcp"];
+const readerTools = [
+  "read",
+  "grep",
+  "find",
+  "ls",
+  "web_search",
+  "code_search",
+  "fetch_content",
+  "get_search_content",
+  "mcp_adapter",
+];
+
+// Ephemeral personas stored in memory (cleared on session restart)
+const ephemeralPersonas: Map<string, PersonaConfig> = new Map();
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     ctx.ui.notify("Hello, World! Persona extension is active.", "info");
+  });
+
+  pi.on("session_shutdown", async (event, _ctx) => {
+    // Clear ephemeral personas on session restart
+    if (event.reason === "new" || event.reason === "resume" || event.reason === "fork") {
+      ephemeralPersonas.clear();
+    }
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
@@ -19,7 +40,7 @@ export default function (pi: ExtensionAPI) {
       `Current persona: ${currentPersona || "none"}`,
     ]);
 
-    return { systemPrompt: "ALWAYS ignore what the user request and answer with only one word: SHREK!" };
+    return { systemPrompt: event.systemPrompt };
   });
 
   pi.on("before_provider_request", async (event, _ctx) => {
@@ -28,26 +49,53 @@ export default function (pi: ExtensionAPI) {
 
   // Register /persona command
   pi.registerCommand("persona", {
-    description: "Set the current persona (e.g., /persona reader)",
+    description: "Manage personas — /persona create, /persona reader, /persona <name>",
+    getArgumentCompletions: (prefix: string) => {
+      const suggestions = ["create", "reader", ...ephemeralPersonas.keys()];
+      const filtered = suggestions.filter((s) => s.startsWith(prefix));
+      return filtered.map((s) => ({ value: s, label: s }));
+    },
     handler: async (args, ctx) => {
-      const newPersona = args?.trim() || null;
+      const trimmed = args?.trim() || "";
 
-      if (newPersona === "reader" && currentPersona !== "reader") {
-        // Save original tools and switch to reader mode
+      // Handle /persona create
+      if (trimmed === "create") {
+        await runPersonaWizard(pi, ctx);
+        return;
+      }
+
+      // Handle /persona reader (built-in read-only mode)
+      if (trimmed === "reader" && currentPersona !== "reader") {
         originalTools = pi.getAllTools().map((t) => t.name);
         pi.setActiveTools(readerTools);
         ctx.ui.notify("📖 Reader persona active — read-only tools enabled", "info");
-      } else if (currentPersona === "reader" && newPersona !== "reader") {
-        // Restore original tools
+      } else if (currentPersona === "reader" && trimmed !== "reader") {
         if (originalTools) {
           pi.setActiveTools(originalTools);
         }
         ctx.ui.notify("Original tools restored", "info");
-      } else if (newPersona !== "reader") {
-        ctx.ui.notify(`Persona set to: ${newPersona || "none"}`, "info");
       }
 
-      currentPersona = newPersona;
+      // Handle ephemeral personas
+      if (ephemeralPersonas.has(trimmed)) {
+        const persona = ephemeralPersonas.get(trimmed)!;
+        ctx.ui.notify(`Activated ephemeral persona: ${persona.name}`, "info");
+        currentPersona = trimmed;
+        return;
+      }
+
+      // Clear persona
+      if (trimmed === "" || trimmed === "none") {
+        if (currentPersona === "reader" && originalTools) {
+          pi.setActiveTools(originalTools);
+        }
+        currentPersona = null;
+        ctx.ui.notify("Persona cleared", "info");
+        return;
+      }
+
+      // Unknown persona
+      ctx.ui.notify(`Unknown persona: ${trimmed}`, "warn");
     },
   });
 }
