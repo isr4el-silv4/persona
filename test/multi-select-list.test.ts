@@ -102,6 +102,7 @@ describe("MultiSelectList", () => {
     const list = new MultiSelectList(items, 5);
     let called = false;
     list.onSelect = () => { called = true; };
+    list.handleInput?.("space"); // select first item
     list.handleInput?.("enter");
     expect(called).toBe(true);
   });
@@ -141,5 +142,25 @@ describe("MultiSelectList", () => {
     // After invalidate, render should return the same lines but recomputed
     const lines = list.render(80);
     expect(lines).toHaveLength(5);
+  });
+
+  it("should call onEmpty callback when enter is pressed with no selections", () => {
+    const list = new MultiSelectList(items, 5);
+    let called = false;
+    list.onEmpty = () => { called = true; };
+    list.handleInput?.("enter");
+    expect(called).toBe(true);
+  });
+
+  it("should NOT call onEmpty when at least one item is selected", () => {
+    const list = new MultiSelectList(items, 5);
+    let emptyCalled = false;
+    let selectCalled = false;
+    list.onEmpty = () => { emptyCalled = true; };
+    list.onSelect = () => { selectCalled = true; };
+    list.handleInput?.("space"); // select first item
+    list.handleInput?.("enter");
+    expect(emptyCalled).toBe(false);
+    expect(selectCalled).toBe(true);
   });
 });

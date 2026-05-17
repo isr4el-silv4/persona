@@ -36,6 +36,7 @@ export class MultiSelectList implements Component {
 
   public onSelect?: () => void;
   public onCancel?: () => void;
+  public onEmpty?: () => void;
 
   constructor(
     items: MultiSelectItem[],
@@ -77,7 +78,11 @@ export class MultiSelectList implements Component {
       }
       this.invalidate();
     } else if (matchesKey(data, "enter")) {
-      this.onSelect?.();
+      if (this.selected.size === 0) {
+        this.onEmpty?.();
+      } else {
+        this.onSelect?.();
+      }
     } else if (matchesKey(data, "escape")) {
       this.onCancel?.();
     }

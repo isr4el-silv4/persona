@@ -29,10 +29,91 @@ export interface EphemeralPersona {
   config: PersonaConfig;
 }
 
+export interface PersonaListItem {
+  name: string;
+  description: string;
+  scope: "global" | "project" | "ephemeral";
+}
+
+function parseYamlFrontmatter(content: string): Partial<PersonaConfig> {
+  const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (!match) return {};
+  const frontmatter = match[1];
+  const result: Partial<PersonaConfig> = {};
+  const lines = frontmatter.split("\n");
+  for (const line of lines) {
+    const colonIndex = line.indexOf(":");
+    if (colonIndex === -1) continue;
+    const key = line.slice(0, colonIndex).trim();
+    const value = line.slice(colonIndex + 1).trim();
+    if (key === "name") result.name = value;
+    else if (key === "description") result.description = value;
+  }
+  return result;
+}
+
+export function listPersonas(ephemeral: Map<string, PersonaConfig>): PersonaListItem[] {
+  const personas: PersonaListItem[] = [];
+
+  // List global personas
+  const globalDir = path.join(process.env.HOME || "", ".pi", "agent", "personas");
+  try {
+    if (fs.existsSync(globalDir)) {
+      const files = fs.readdirSync(globalDir).filter((f) => f.endsWith(".yaml"));
+      for (const file of files) {
+        const filePath = path.join(globalDir, file);
+        const content = fs.readFileSync(filePath, "utf-8");
+        const parsed = parseYamlFrontmatter(content);
+        personas.push({
+          name: parsed.name || file.replace(".yaml", ""),
+          description: parsed.description || "",
+          scope: "global",
+        });
+      }
+    }
+  } catch {
+    // Ignore errors reading global directory
+  }
+
+  // List project personas
+  const projectDir = path.join(process.cwd(), ".pi", "personas");
+  try {
+    if (fs.existsSync(projectDir)) {
+      const files = fs.readdirSync(projectDir).filter((f) => f.endsWith(".yaml"));
+      for (const file of files) {
+        const filePath = path.join(projectDir, file);
+        const content = fs.readFileSync(filePath, "utf-8");
+        const parsed = parseYamlFrontmatter(content);
+        personas.push({
+          name: parsed.name || file.replace(".yaml", ""),
+          description: parsed.description || "",
+          scope: "project",
+        });
+      }
+    }
+  } catch {
+    // Ignore errors reading project directory
+  }
+
+  // List ephemeral personas
+  for (const [name, ep] of ephemeral) {
+    personas.push({
+      name,
+      description: ep.description || "",
+      scope: "ephemeral",
+    });
+  }
+
+  return personas;
+}
+
 interface SelectOption {
   value: SystemPromptMode | PersonaScope;
   label: string;
 }
+
+// Only allow letters, numbers, hyphens, and underscores
+const PERSONA_NAME_REGEX = /^[a-z0-9_-]+$/;
 
 const SCOPES: readonly SelectOption[] = [
   { value: PersonaScope.GLOBAL, label: "Global (~/.pi/agent/personas/)" },
@@ -99,6 +180,10 @@ async function askToolsSelect(pi: ExtensionAPI, ctx: ExtensionContext): Promise<
 
     const helpText = "↑↓ navigate • space toggle • ctrl+a select all • enter continue • esc cancel";
 
+    multiSelect.onEmpty = () => {
+      ctx.ui.notify("At least 1 tool must be selected.", "error");
+    };
+
     c.ui.custom((tui: any, theme: any, _kb: any, done: (result: any) => void) => {
       const container = new Container();
 
@@ -111,6 +196,10 @@ async function askToolsSelect(pi: ExtensionAPI, ctx: ExtensionContext): Promise<
 
       multiSelect.onSelect = () => {
         const values = multiSelect.getSelectedValues();
+        if (values.length === 0) {
+          multiSelect.onEmpty?.();
+          return;
+        }
         done(null);
         resolve(values);
       };
@@ -168,8 +257,13 @@ export async function runPersonaWizard(pi: ExtensionAPI, ctx: ExtensionContext):
 
   try {
     // Step 1: Name
-    const name = await askInput(ctx, "Persona name:");
+    const name = await askInput(ctx, "Persona name (letters, numbers, -, _ only):", "my-persona");
     if (!name) return ctx.ui.notify("Wizard cancelled.", "info");
+    const sanitizedName = name.toLowerCase().replace(/\s+/g, "-");
+    if (!PERSONA_NAME_REGEX.test(sanitizedName)) {
+      ctx.ui.notify("Invalid name. Only letters, numbers, hyphens (-), and underscores (_) are allowed.", "error");
+      return;
+    }
 
     // Step 2: Description
     const description = await askInput(ctx, `Description for "${name}" (e.g., "Fast codebase recon"):`);

@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { runPersonaWizard, type PersonaConfig } from "./persona-wizard";
+import { runPersonaWizard, type PersonaConfig, listPersonas } from "./persona-wizard";
 
 // Global state — accessible across all handlers in this extension
 let currentPersona: string | null = null;
@@ -44,14 +44,14 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_provider_request", async (event, _ctx) => {
-    console.log(JSON.stringify(event.payload, null, 2));
+    // console.log(JSON.stringify(event.payload, null, 2)); only uncomment when debugging
   });
 
   // Register /persona command
   pi.registerCommand("persona", {
-    description: "Manage personas — /persona create, /persona reader, /persona <name>",
+    description: "Manage personas — /persona create, /persona list, /persona reader, /persona <name>",
     getArgumentCompletions: (prefix: string) => {
-      const suggestions = ["create", "reader", ...ephemeralPersonas.keys()];
+      const suggestions = ["create", "list", "reader", ...ephemeralPersonas.keys()];
       const filtered = suggestions.filter((s) => s.startsWith(prefix));
       return filtered.map((s) => ({ value: s, label: s }));
     },
@@ -61,6 +61,23 @@ export default function (pi: ExtensionAPI) {
       // Handle /persona create
       if (trimmed === "create") {
         await runPersonaWizard(pi, ctx);
+        return;
+      }
+
+      // Handle /persona list
+      if (trimmed === "list") {
+        const personas = listPersonas(ephemeralPersonas);
+        if (personas.length === 0) {
+          ctx.ui.notify("No personas found. Create one with /persona create", "info");
+        } else {
+          const lines = personas.map((p) => `  ${p.name} — ${p.description || "(no description)"}`);
+          ctx.ui.setWidget("persona-list", [
+            `Found ${personas.length} persona(s):`,
+            ...lines,
+            "",
+            "Use /persona <name> to activate, /persona none to clear.",
+          ]);
+        }
         return;
       }
 
