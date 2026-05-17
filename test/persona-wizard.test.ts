@@ -605,7 +605,7 @@ Test prompt.
       fs.rmSync(tmpDir, { recursive: true });
 
       expect(result.success).toBe(true);
-      expect(result.message).toContain("Deleted global persona");
+      expect(result.message).toContain("🗑️ Deleted global persona");
     });
 
     it("should return failure for non-existent global persona", () => {
@@ -648,7 +648,7 @@ Test prompt.
       fs.rmSync(tmpDir, { recursive: true });
 
       expect(result.success).toBe(true);
-      expect(result.message).toContain("Deleted project persona");
+      expect(result.message).toContain("🗑️ Deleted project persona");
     });
 
     it("should handle persona names with spaces (sanitized to hyphens)", () => {

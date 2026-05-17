@@ -93,7 +93,7 @@ export function deletePersona(name: string, scope: DeleteScope): { success: bool
     }
     try {
       fs.unlinkSync(filePath);
-      return { success: true, message: `✅ Deleted global persona "${name}".` };
+      return { success: true, message: `🗑️ Deleted global persona "${name}".` };
     } catch (error: any) {
       return { success: false, message: `Failed to delete: ${error.message}` };
     }
@@ -107,7 +107,7 @@ export function deletePersona(name: string, scope: DeleteScope): { success: bool
     }
     try {
       fs.unlinkSync(filePath);
-      return { success: true, message: `✅ Deleted project persona "${name}".` };
+      return { success: true, message: `🗑️ Deleted project persona "${name}".` };
     } catch (error: any) {
       return { success: false, message: `Failed to delete: ${error.message}` };
     }
