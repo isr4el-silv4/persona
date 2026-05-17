@@ -16,6 +16,6 @@
     "sourceMap": true,
     "types": ["jest", "node"]
   },
-  "include": ["**/*.ts", "pi-coding-agent-mock.d.ts"],
+  "include": ["**/*.ts", "test/__mocks__/types.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -57,7 +57,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_provider_request", async (event, _ctx) => {
-    console.log(JSON.stringify(event.payload, null, 2)); // only uncomment when debugging
+    // console.log(JSON.stringify(event.payload, null, 2)); // only uncomment when debugging
   });
 
   // Register /persona command
