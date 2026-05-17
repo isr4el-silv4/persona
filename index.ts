@@ -15,6 +15,19 @@ let originalTools: string[] | null = null;
 // Ephemeral personas stored in memory (cleared on session restart)
 const ephemeralPersonas: Map<string, PersonaConfig> = new Map();
 
+function getScopeEmoji(scope: string): string {
+  switch (scope) {
+    case "global":
+      return "🌍";
+    case "project":
+      return "📁";
+    case "ephemeral":
+      return "⚡";
+    default:
+      return "🎭";
+  }
+}
+
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     ctx.ui.notify("Hello, World! Persona extension is active.", "info");
@@ -66,11 +79,11 @@ export default function (pi: ExtensionAPI) {
     getArgumentCompletions: (prefix: string) => {
       const personas = listPersonas(ephemeralPersonas);
 
-      // If prefix starts with "delete ", show persona options for deletion
+      // If prefix starts with "delete ", show persona options for deletion with scope emojis
       if (prefix.startsWith("delete ")) {
         const search = prefix.slice(7).trim();
         const filtered = personas.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
-        return filtered.map((p) => ({ value: `delete ${p.name}`, label: p.name }));
+        return filtered.map((p) => ({ value: `delete ${p.name}`, label: `${getScopeEmoji(p.scope)} ${p.name}` }));
       }
 
       // Otherwise show command suggestions + personas
