@@ -132,6 +132,11 @@ function ensureCtx(ctx: ExtensionContext | undefined): ExtensionContext {
 
 async function askInput(ctx: ExtensionContext, prompt: string, defaultValue?: string): Promise<string | null> {
   const c = ensureCtx(ctx);
+  if (defaultValue === "") {
+    // Show placeholder but allow empty input
+    const result = await c.ui.input(prompt);
+    return result;
+  }
   const result = await c.ui.input(prompt, defaultValue);
   return result;
 }
@@ -139,17 +144,32 @@ async function askInput(ctx: ExtensionContext, prompt: string, defaultValue?: st
 async function askSelect(
   ctx: ExtensionContext,
   prompt: string,
-  options: readonly SelectOption[]
+  options: readonly SelectOption[],
+  defaultValue?: SystemPromptMode | PersonaScope
 ): Promise<string | null> {
   const c = ensureCtx(ctx);
   const labels = options.map((o) => o.label);
+  
+  // If a default value is provided, highlight it in the select list
+  if (defaultValue !== undefined) {
+    const defaultIndex = options.findIndex((o) => o.value === defaultValue);
+    if (defaultIndex >= 0) {
+      // Pass the default index to ui.select (third argument)
+      const result = await c.ui.select(prompt, labels, defaultIndex);
+      if (result === null || result === undefined) return null;
+      const found = options.find((o) => o.label === result);
+      return found ? found.value : null;
+    }
+  }
+  
+  // No default - call without index
   const result = await c.ui.select(prompt, labels);
   if (result === null || result === undefined) return null;
   const found = options.find((o) => o.label === result);
   return found ? found.value : null;
 }
 
-async function askToolsSelect(pi: ExtensionAPI, ctx: ExtensionContext): Promise<string[]> {
+async function askToolsSelect(pi: ExtensionAPI, ctx: ExtensionContext, preSelected?: string[]): Promise<string[]> {
   const c = ensureCtx(ctx);
   const allTools = await pi.getAllTools();
   const items: MultiSelectItem[] = allTools.map((tool: { name: string }) => ({
@@ -157,8 +177,8 @@ async function askToolsSelect(pi: ExtensionAPI, ctx: ExtensionContext): Promise<
     label: tool.name,
   }));
 
-  // Default: select read, grep, find, ls
-  const defaultTools = ["read", "grep", "find", "ls"];
+  // Default: select read, grep, find, ls (or use pre-selected if provided)
+  const defaultTools = preSelected && preSelected.length > 0 ? preSelected : ["read", "grep", "find", "ls"];
   const selected = new Set(items.filter((i) => defaultTools.includes(i.value)).map((i) => i.value));
 
   return new Promise<string[]>((resolve) => {
@@ -215,9 +235,9 @@ async function askToolsSelect(pi: ExtensionAPI, ctx: ExtensionContext): Promise<
   });
 }
 
-async function askConfirm(ctx: ExtensionContext, prompt: string): Promise<boolean> {
+async function askConfirm(ctx: ExtensionContext, prompt: string, defaultValue?: boolean): Promise<boolean> {
   const c = ensureCtx(ctx);
-  const result = await c.ui.confirm("Persona Wizard", prompt);
+  const result = await c.ui.confirm("Persona Wizard", prompt, defaultValue);
   return result;
 }
 
@@ -246,12 +266,21 @@ function getPersonaFilePath(scope: PersonaScope, name: string): string | null {
 }
 
 export async function runPersonaWizard(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+  await runWizard(pi, ctx, null);
+}
+
+export async function runEditPersonaWizard(pi: ExtensionAPI, ctx: ExtensionContext, persona: LoadedPersona): Promise<void> {
+  await runWizard(pi, ctx, persona);
+}
+
+async function runWizard(pi: ExtensionAPI, ctx: ExtensionContext, existingPersona: LoadedPersona | null): Promise<void> {
   // Validate context upfront
   ensureCtx(ctx);
 
   try {
     // Step 1: Name
-    const name = await askInput(ctx, "Persona name (letters, numbers, -, _ only):", "my-persona");
+    const defaultName = existingPersona?.name || "my-persona";
+    const name = await askInput(ctx, "Persona name (letters, numbers, -, _ only):", defaultName);
     if (!name) return ctx.ui.notify("Wizard cancelled.", "info");
     const sanitizedName = name.toLowerCase().replace(/\s+/g, "-");
     if (!PERSONA_NAME_REGEX.test(sanitizedName)) {
@@ -260,29 +289,49 @@ export async function runPersonaWizard(pi: ExtensionAPI, ctx: ExtensionContext):
     }
 
     // Step 2: Description
-    const description = await askInput(ctx, `Description for "${name}" (e.g., "Fast codebase recon"):`);
+    const defaultDescription = existingPersona?.description || "";
+    const description = await askInput(ctx, `Description for "${name}" (e.g., "Fast codebase recon"):`, defaultDescription);
     if (!description) return ctx.ui.notify("Wizard cancelled.", "info");
 
     // Step 3: Tools
-    const tools = await askToolsSelect(pi, ctx);
+    const existingTools = existingPersona?.tools || [];
+    const tools = await askToolsSelect(pi, ctx, existingTools);
     if (tools.length === 0) return ctx.ui.notify("Wizard cancelled.", "info");
 
     // Step 4: System prompt mode
-    const systemPromptMode = await askSelect(ctx, "System prompt mode:", SYSTEM_PROMPT_MODES);
+    const systemPromptMode = await askSelect(
+      ctx,
+      "System prompt mode:",
+      SYSTEM_PROMPT_MODES,
+      existingPersona?.systemPromptMode
+    );
     if (!systemPromptMode) return ctx.ui.notify("Wizard cancelled.", "info");
 
     // Step 5: Inherit project context
-    const inheritProjectContext = await askConfirm(ctx, "Inherit project context (AGENTS.md files)?");
+    const inheritProjectContext = await askConfirm(
+      ctx,
+      "Inherit project context (AGENTS.md files)?",
+      existingPersona?.inheritProjectContext
+    );
 
     // Step 6: Interactive
-    const interactive = await askConfirm(ctx, "Is this persona interactive (can prompt the user)?");
+    const interactive = await askConfirm(
+      ctx,
+      "Is this persona interactive (can prompt the user)?",
+      existingPersona?.interactive
+    );
 
     // Step 7: System prompt
-    const systemPrompt = await askInput(ctx, "System prompt (press Enter when done):\n");
+    const systemPrompt = await askInput(ctx, "System prompt (press Enter when done):\n", existingPersona?.systemPrompt);
     if (systemPrompt === null) return ctx.ui.notify("Wizard cancelled.", "info");
 
     // Step 8: Scope
-    const scope = await askSelect(ctx, "Persona scope:", SCOPES);
+    const scope = await askSelect(
+      ctx,
+      "Persona scope:",
+      SCOPES,
+      existingPersona?.scope as PersonaScope | undefined
+    );
     if (!scope) return ctx.ui.notify("Wizard cancelled.", "info");
 
     // Build config
@@ -307,17 +356,18 @@ export async function runPersonaWizard(pi: ExtensionAPI, ctx: ExtensionContext):
     const filePath = getPersonaFilePath(scope as PersonaScope, name);
     if (!filePath) return;
 
-    const yaml = generateYaml(config);
-
-    // Ensure directory exists
     const resolvedPath = filePath.replace("~", process.env.HOME || "");
     const dir = path.dirname(resolvedPath);
     fs.mkdirSync(dir, { recursive: true });
 
     // Write the file
     try {
-      fs.writeFileSync(resolvedPath, yaml, "utf-8");
-      ctx.ui.notify(`✨ Persona "${name}" created at ${filePath}`, "success");
+      fs.writeFileSync(resolvedPath, generateYaml(config), "utf-8");
+      if (existingPersona) {
+        ctx.ui.notify(`✅ Persona "${name}" updated at ${filePath}`);
+      } else {
+        ctx.ui.notify(`✨ Persona "${name}" created at ${filePath}`, "success");
+      }
     } catch (error: any) {
       ctx.ui.notify(`Failed to save persona: ${error.message}`, "error");
     }

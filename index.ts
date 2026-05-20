@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   runPersonaWizard,
+  runEditPersonaWizard,
   type PersonaConfig,
   listPersonas,
   type LoadedPersona,
@@ -69,8 +70,15 @@ export default function (pi: ExtensionAPI) {
         return filtered.map((p) => ({ value: `delete ${p.name}`, label: `${getScopeEmoji(p.scope)} ${p.name}` }));
       }
 
+      // If prefix starts with "edit ", show persona options for editing
+      if (prefix.startsWith("edit ")) {
+        const search = prefix.slice(5).trim();
+        const filtered = personas.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+        return filtered.map((p) => ({ value: `edit ${p.name}`, label: `${getScopeEmoji(p.scope)} ${p.name}` }));
+      }
+
       // Otherwise show command suggestions + personas
-      const suggestions = ["create", "list", "delete", ...personas.map((p) => `[persona] ${p.name}`)];
+      const suggestions = ["create", "list", "delete", "edit", ...personas.map((p) => `[persona] ${p.name}`)];
       const filtered = suggestions.filter((s) => s.startsWith(prefix));
       return filtered.map((s) => ({ value: s.replace(/^\[persona\] /, ""), label: s }));
     },
@@ -130,6 +138,26 @@ export default function (pi: ExtensionAPI) {
         }
 
         ctx.ui.notify(result.message, result.success ? "success" : "error");
+        return;
+      }
+
+      // Handle /persona edit <name>
+      if (trimmed.startsWith("edit ")) {
+        const personaName = trimmed.slice(5).trim();
+        if (!personaName) {
+          ctx.ui.notify("Usage: /persona edit <persona-name>", "warn");
+          return;
+        }
+
+        // Load the persona
+        const loaded = loadPersona(personaName);
+        if (!loaded) {
+          ctx.ui.notify(`❌ Unknown persona: ${personaName}. Run /persona list to see available personas.`, "error");
+          return;
+        }
+
+        // Open the edit wizard
+        await runEditPersonaWizard(pi, ctx, loaded);
         return;
       }
 

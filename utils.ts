@@ -4,6 +4,12 @@ import type { PersonaConfig, LoadedPersona } from "./persona-wizard";
 
 export { PersonaConfig, LoadedPersona };
 
+// Re-export generateYaml for use in savePersona
+import { generateYaml as _generateYaml } from "./persona-wizard";
+function generateYaml(config: PersonaConfig): string {
+  return _generateYaml(config);
+}
+
 export function parseYamlFrontmatter(content: string): Partial<PersonaConfig> {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
   if (!match) return {};
@@ -92,6 +98,22 @@ export function getScopeEmoji(scope: string): string {
       return "⚡";
     default:
       return "🎭";
+  }
+}
+
+export function savePersona(config: PersonaConfig, filePath: string): { success: boolean; message: string } {
+  const yaml = generateYaml(config);
+
+  // Ensure directory exists
+  const resolvedPath = filePath.replace("~", process.env.HOME || "");
+  const dir = path.dirname(resolvedPath);
+  fs.mkdirSync(dir, { recursive: true });
+
+  try {
+    fs.writeFileSync(resolvedPath, yaml, "utf-8");
+    return { success: true, message: `✅ Saved persona "${config.name}" to ${filePath}` };
+  } catch (error: any) {
+    return { success: false, message: `Failed to save persona: ${error.message}` };
   }
 }
 
