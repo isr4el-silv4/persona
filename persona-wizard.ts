@@ -3,6 +3,7 @@ import path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { MultiSelectList, type MultiSelectItem } from "./multi-select-list";
 import { Container, Text, type Component } from "@earendil-works/pi-tui";
+import { deletePersona as _deletePersona, DeleteScope } from "./utils";
 
 export enum SystemPromptMode {
   REPLACE = "replace",
@@ -364,6 +365,16 @@ async function runWizard(pi: ExtensionAPI, ctx: ExtensionContext, existingPerson
     try {
       fs.writeFileSync(resolvedPath, generateYaml(config), "utf-8");
       if (existingPersona) {
+        // Delete old file if name or scope changed
+        const oldSafeName = existingPersona.name.toLowerCase().replace(/\s+/g, "-");
+        const newSafeName = sanitizedName;
+        const oldScope = existingPersona.scope as "global" | "project";
+        const newScope = scope as "global" | "project";
+
+        if (oldSafeName !== newSafeName || oldScope !== newScope) {
+          const oldDeleteScope = (oldScope === "global") ? DeleteScope.GLOBAL : DeleteScope.PROJECT;
+          _deletePersona(oldSafeName, oldDeleteScope);
+        }
         ctx.ui.notify(`✅ Persona "${name}" updated at ${filePath}`);
       } else {
         ctx.ui.notify(`✨ Persona "${name}" created at ${filePath}`, "success");

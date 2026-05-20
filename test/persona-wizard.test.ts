@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 
 // These imports will use the mocked module
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { generateYaml, type PersonaConfig, SystemPromptMode, PersonaScope, runPersonaWizard, listPersonas } from "../persona-wizard";
+import { generateYaml, type PersonaConfig, type LoadedPersona, SystemPromptMode, PersonaScope, runPersonaWizard, runEditPersonaWizard, listPersonas } from "../persona-wizard";
 import { loadPersona, deletePersona, DeleteScope } from "../utils";
 
 // Mock the UI methods
@@ -678,6 +678,195 @@ Test prompt.
       fs.rmSync(tmpDir, { recursive: true });
 
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe("runEditPersonaWizard", () => {
+    it("should update persona and delete old file when name changes", async () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-edit-test-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      // Create initial persona file
+      const oldYaml = `---
+name: old-name
+description: Old description
+tools: read, grep
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Old prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "old-name.yaml"), oldYaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      // Mock the wizard flow for editing
+      mockInput
+        .mockResolvedValueOnce("new-name") // name (changed)
+        .mockResolvedValueOnce("New description") // description
+        .mockResolvedValueOnce("New prompt") // system prompt
+      mockSelect
+        .mockResolvedValueOnce("Replace — overwrite the entire system prompt") // systemPromptMode
+        .mockResolvedValueOnce("Global (~/.pi/agent/personas/)"); // scope
+
+      const loadedPersona = {
+        name: "old-name",
+        description: "Old description",
+        tools: ["read", "grep"],
+        systemPromptMode: SystemPromptMode.REPLACE,
+        inheritProjectContext: false,
+        interactive: true,
+        systemPrompt: "Old prompt.",
+        scope: "global",
+        filePath: path.join(globalDir, "old-name.yaml"),
+      } as LoadedPersona;
+
+      await runEditPersonaWizard(mockPi, mockCtx, loadedPersona);
+
+      // Verify new file was created
+      const newYamlPath = path.join(globalDir, "new-name.yaml");
+      expect(fs.existsSync(newYamlPath)).toBe(true);
+      const newContent = fs.readFileSync(newYamlPath, "utf-8");
+      expect(newContent).toContain("name: new-name");
+      expect(newContent).toContain("New description");
+      expect(newContent).toContain("New prompt");
+
+      // Verify old file was deleted
+      expect(fs.existsSync(path.join(globalDir, "old-name.yaml"))).toBe(false);
+
+      // Verify success notification
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.stringMatching(/Persona "new-name" updated/)
+      );
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("should update persona and delete old file when scope changes", async () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-edit-scope-test-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      const projectDir = path.join(tmpDir, ".pi", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+      fs.mkdirSync(projectDir, { recursive: true });
+
+      // Create initial global persona file
+      const oldYaml = `---
+name: scope-test
+description: Scope test
+tools: read, grep
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Scope prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "scope-test.yaml"), oldYaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      const originalCwd = process.cwd();
+      process.env.HOME = tmpDir;
+      process.chdir(tmpDir);
+
+      // Mock the wizard flow for editing with scope change
+      mockInput
+        .mockResolvedValueOnce("scope-test") // name (same)
+        .mockResolvedValueOnce("Scope test") // description
+        .mockResolvedValueOnce("Updated prompt") // system prompt
+      mockSelect
+        .mockResolvedValueOnce("Replace — overwrite the entire system prompt") // systemPromptMode
+        .mockResolvedValueOnce("Project (.pi/personas/)"); // scope (changed)
+
+      const loadedPersona = {
+        name: "scope-test",
+        description: "Scope test",
+        tools: ["read", "grep"],
+        systemPromptMode: SystemPromptMode.REPLACE,
+        inheritProjectContext: false,
+        interactive: true,
+        systemPrompt: "Scope prompt.",
+        scope: "global",
+        filePath: path.join(globalDir, "scope-test.yaml"),
+      } as LoadedPersona;
+
+      await runEditPersonaWizard(mockPi, mockCtx, loadedPersona);
+
+      // Verify new file was created in project directory
+      const newFilePath = path.join(projectDir, "scope-test.yaml");
+      expect(fs.existsSync(newFilePath)).toBe(true);
+      const newContent = fs.readFileSync(newFilePath, "utf-8");
+      expect(newContent).toContain("name: scope-test");
+      expect(newContent).toContain("Updated prompt");
+
+      // Verify old file was deleted from global directory
+      expect(fs.existsSync(path.join(globalDir, "scope-test.yaml"))).toBe(false);
+
+      process.env.HOME = originalHome;
+      process.chdir(originalCwd);
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("should update persona without deleting when name and scope are unchanged", async () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-edit-same-test-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      // Create initial persona file
+      const oldYaml = `---
+name: same-name
+description: Old description
+tools: read, grep
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Old prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "same-name.yaml"), oldYaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      // Mock the wizard flow for editing (same name and scope)
+      mockInput
+        .mockResolvedValueOnce("same-name") // name (unchanged)
+        .mockResolvedValueOnce("New description") // description
+        .mockResolvedValueOnce("New prompt") // system prompt
+      mockSelect
+        .mockResolvedValueOnce("Replace — overwrite the entire system prompt") // systemPromptMode
+        .mockResolvedValueOnce("Global (~/.pi/agent/personas/)"); // scope (unchanged)
+
+      const loadedPersona = {
+        name: "same-name",
+        description: "Old description",
+        tools: ["read", "grep"],
+        systemPromptMode: SystemPromptMode.REPLACE,
+        inheritProjectContext: false,
+        interactive: true,
+        systemPrompt: "Old prompt.",
+        scope: "global",
+        filePath: path.join(globalDir, "same-name.yaml"),
+      } as LoadedPersona;
+
+      await runEditPersonaWizard(mockPi, mockCtx, loadedPersona);
+
+      // Verify file was updated (not deleted and recreated)
+      const filePath = path.join(globalDir, "same-name.yaml");
+      expect(fs.existsSync(filePath)).toBe(true);
+      const content = fs.readFileSync(filePath, "utf-8");
+      expect(content).toContain("name: same-name");
+      expect(content).toContain("New description");
+      expect(content).toContain("New prompt");
+
+      // Verify only one file exists (not deleted and recreated)
+      const files = fs.readdirSync(globalDir).filter((f) => f.endsWith(".yaml"));
+      expect(files.length).toBe(1);
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
     });
   });
 });
