@@ -8,6 +8,7 @@ import {
 } from "./persona-wizard";
 import { loadPersona, deletePersona, DeleteScope, getScopeEmoji } from "./utils";
 import { PersonaIndicator } from "./persona-indicator";
+import { checkToolBlock, buildBlockNotification } from "./tool-blocker";
 
 // Global state — accessible across all handlers in this extension
 let currentPersona: LoadedPersona | null = null;
@@ -55,6 +56,20 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("before_provider_request", async (event, _ctx) => {
     // console.log(JSON.stringify(event.payload, null, 2)); // only uncomment when debugging
+  });
+
+  // Block tools not allowed by the active persona
+  pi.on("tool_call", async (event, ctx) => {
+    if (!currentPersona) return;
+
+    const blockResult = checkToolBlock(currentPersona, event.toolName);
+    if (blockResult) {
+      ctx.ui.notify(
+        buildBlockNotification(event.toolName, currentPersona.name),
+        "warn",
+      );
+      return blockResult;
+    }
   });
 
   // Register /persona command
