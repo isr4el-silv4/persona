@@ -681,6 +681,389 @@ Test prompt.
     });
   });
 
+  describe("runEditPersonaWizard — edit without changing all fields", () => {
+    it("should keep existing values when user presses Enter without changing anything", async () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-edit-skip-name-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      const yaml = `---
+name: my-persona
+description: A test persona
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Some prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "my-persona.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      // User presses Enter on every field (keeps all existing values)
+      mockInput
+        .mockResolvedValueOnce("")            // name (empty -> keep existing)
+        .mockResolvedValueOnce("")            // description (empty -> keep existing)
+        .mockResolvedValueOnce("")            // system prompt (empty -> keep existing)
+      mockSelect
+        .mockResolvedValueOnce("Replace — overwrite the entire system prompt")
+        .mockResolvedValueOnce("Global (~/.pi/agent/personas/)");
+
+      const loadedPersona = {
+        name: "my-persona",
+        description: "A test persona",
+        tools: ["read"],
+        systemPromptMode: SystemPromptMode.REPLACE,
+        inheritProjectContext: false,
+        interactive: true,
+        systemPrompt: "Some prompt.",
+        scope: "global",
+        filePath: path.join(globalDir, "my-persona.yaml"),
+      } as LoadedPersona;
+
+      await runEditPersonaWizard(mockPi, mockCtx, loadedPersona);
+
+      expect(mockNotify).not.toHaveBeenCalledWith("Wizard cancelled.", "info");
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.stringMatching(/Persona "my-persona" updated/)
+      );
+
+      const content = fs.readFileSync(path.join(globalDir, "my-persona.yaml"), "utf-8");
+      expect(content).toContain("name: my-persona");
+      expect(content).toContain("description: A test persona");
+      expect(content).toContain("Some prompt.");
+
+            process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("should trim whitespace from text inputs", async () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-edit-trim-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      const yaml = `---
+name: trim-test
+description: Original
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Original prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "trim-test.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      // User enters values with leading/trailing whitespace
+      mockInput
+        .mockResolvedValueOnce("  trim-test  ")   // name with spaces
+        .mockResolvedValueOnce("  Trimmed desc  ") // description with spaces
+        .mockResolvedValueOnce("  Trimmed prompt  ") // system prompt with spaces
+      mockSelect
+        .mockResolvedValueOnce("Replace — overwrite the entire system prompt")
+        .mockResolvedValueOnce("Global (~/.pi/agent/personas/)");
+
+      const loadedPersona = {
+        name: "trim-test",
+        description: "Original",
+        tools: ["read"],
+        systemPromptMode: SystemPromptMode.REPLACE,
+        inheritProjectContext: false,
+        interactive: true,
+        systemPrompt: "Original prompt.",
+        scope: "global",
+        filePath: path.join(globalDir, "trim-test.yaml"),
+      } as LoadedPersona;
+
+      await runEditPersonaWizard(mockPi, mockCtx, loadedPersona);
+
+      const content = fs.readFileSync(path.join(globalDir, "trim-test.yaml"), "utf-8");
+      expect(content).toContain("name: trim-test");
+      expect(content).toContain("description: Trimmed desc");
+      expect(content).toContain("Trimmed prompt");
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("should treat whitespace-only input as empty (keep existing value)", async () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-edit-whitespace-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      const yaml = `---
+name: ws-test
+description: Keep this
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Keep this prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "ws-test.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      // User enters whitespace-only → should keep existing values
+      mockInput
+        .mockResolvedValueOnce("   ")   // name: whitespace-only → keep existing
+        .mockResolvedValueOnce("\t\n")  // description: whitespace-only → keep existing
+        .mockResolvedValueOnce("  ")    // system prompt: whitespace-only → keep existing
+      mockSelect
+        .mockResolvedValueOnce("Replace — overwrite the entire system prompt")
+        .mockResolvedValueOnce("Global (~/.pi/agent/personas/)");
+
+      const loadedPersona = {
+        name: "ws-test",
+        description: "Keep this",
+        tools: ["read"],
+        systemPromptMode: SystemPromptMode.REPLACE,
+        inheritProjectContext: false,
+        interactive: true,
+        systemPrompt: "Keep this prompt.",
+        scope: "global",
+        filePath: path.join(globalDir, "ws-test.yaml"),
+      } as LoadedPersona;
+
+      await runEditPersonaWizard(mockPi, mockCtx, loadedPersona);
+
+      const content = fs.readFileSync(path.join(globalDir, "ws-test.yaml"), "utf-8");
+      expect(content).toContain("name: ws-test");
+      expect(content).toContain("description: Keep this");
+      expect(content).toContain("Keep this prompt.");
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("should allow proceeding when description is empty and user keeps it empty", async () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-edit-empty-desc-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      // Persona with empty description
+      const yaml = `---
+name: no-desc
+description:
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Some prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "no-desc.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      // User presses Enter on fields to keep existing values
+      mockInput
+        .mockResolvedValueOnce("")         // name (empty -> keep existing)
+        .mockResolvedValueOnce("")         // description (empty -> keep existing empty)
+        .mockResolvedValueOnce("")         // system prompt (empty -> keep existing)
+      mockSelect
+        .mockResolvedValueOnce("Replace — overwrite the entire system prompt")
+        .mockResolvedValueOnce("Global (~/.pi/agent/personas/)");
+
+      const loadedPersona = {
+        name: "no-desc",
+        description: "",
+        tools: ["read"],
+        systemPromptMode: SystemPromptMode.REPLACE,
+        inheritProjectContext: false,
+        interactive: true,
+        systemPrompt: "Some prompt.",
+        scope: "global",
+        filePath: path.join(globalDir, "no-desc.yaml"),
+      } as LoadedPersona;
+
+      await runEditPersonaWizard(mockPi, mockCtx, loadedPersona);
+
+      // Should NOT have cancelled due to empty description
+      expect(mockNotify).not.toHaveBeenCalledWith("Wizard cancelled.", "info");
+      // Should have updated
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.stringMatching(/Persona "no-desc" updated/)
+      );
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("should allow proceeding when system prompt is empty and user keeps it empty", async () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-edit-empty-prompt-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      // Persona with empty system prompt
+      const yaml = `---
+name: no-prompt
+description: A persona
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+`;
+      fs.writeFileSync(path.join(globalDir, "no-prompt.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      // User presses Enter on fields to keep existing values
+      mockInput
+        .mockResolvedValueOnce("")          // name (empty -> keep existing)
+        .mockResolvedValueOnce("")          // description (empty -> keep existing)
+        .mockResolvedValueOnce("")          // system prompt (empty -> keep existing empty)
+      mockSelect
+        .mockResolvedValueOnce("Replace — overwrite the entire system prompt")
+        .mockResolvedValueOnce("Global (~/.pi/agent/personas/)");
+
+      const loadedPersona = {
+        name: "no-prompt",
+        description: "A persona",
+        tools: ["read"],
+        systemPromptMode: SystemPromptMode.REPLACE,
+        inheritProjectContext: false,
+        interactive: true,
+        systemPrompt: "",
+        scope: "global",
+        filePath: path.join(globalDir, "no-prompt.yaml"),
+      } as LoadedPersona;
+
+      await runEditPersonaWizard(mockPi, mockCtx, loadedPersona);
+
+      // Should NOT have cancelled
+      expect(mockNotify).not.toHaveBeenCalledWith("Wizard cancelled.", "info");
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.stringMatching(/Persona "no-prompt" updated/)
+      );
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("should still cancel when user explicitly cancels (returns null)", async () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-edit-cancel-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      const yaml = `---
+name: cancel-test
+description: Test
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "cancel-test.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      // User cancels on the description step (returns null)
+      mockInput
+        .mockResolvedValueOnce("cancel-test") // name
+        .mockResolvedValueOnce(null);          // description -> cancelled
+
+      const loadedPersona = {
+        name: "cancel-test",
+        description: "Test",
+        tools: ["read"],
+        systemPromptMode: SystemPromptMode.REPLACE,
+        inheritProjectContext: false,
+        interactive: true,
+        systemPrompt: "Prompt.",
+        scope: "global",
+        filePath: path.join(globalDir, "cancel-test.yaml"),
+      } as LoadedPersona;
+
+      await runEditPersonaWizard(mockPi, mockCtx, loadedPersona);
+
+      // Should have cancelled
+      expect(mockNotify).toHaveBeenCalledWith("Wizard cancelled.", "info");
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("should allow changing only one field while keeping others unchanged", async () => {
+      const tmpDir = fs.mkdtempSync("/tmp/persona-edit-partial-");
+      const globalDir = path.join(tmpDir, ".pi", "agent", "personas");
+      fs.mkdirSync(globalDir, { recursive: true });
+
+      const yaml = `---
+name: partial-edit
+description: Old description
+tools: read
+systemPromptMode: replace
+inheritProjectContext: false
+interactive: true
+---
+Old prompt.
+`;
+      fs.writeFileSync(path.join(globalDir, "partial-edit.yaml"), yaml, "utf-8");
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = tmpDir;
+
+      // User only changes description, keeps everything else
+      mockInput
+        .mockResolvedValueOnce("partial-edit")      // name (unchanged)
+        .mockResolvedValueOnce("New description")   // description (CHANGED)
+        .mockResolvedValueOnce("Old prompt.")       // system prompt (unchanged)
+      mockSelect
+        .mockResolvedValueOnce("Replace — overwrite the entire system prompt")
+        .mockResolvedValueOnce("Global (~/.pi/agent/personas/)");
+
+      const loadedPersona = {
+        name: "partial-edit",
+        description: "Old description",
+        tools: ["read"],
+        systemPromptMode: SystemPromptMode.REPLACE,
+        inheritProjectContext: false,
+        interactive: true,
+        systemPrompt: "Old prompt.",
+        scope: "global",
+        filePath: path.join(globalDir, "partial-edit.yaml"),
+      } as LoadedPersona;
+
+      await runEditPersonaWizard(mockPi, mockCtx, loadedPersona);
+
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.stringMatching(/Persona "partial-edit" updated/)
+      );
+
+      const content = fs.readFileSync(path.join(globalDir, "partial-edit.yaml"), "utf-8");
+      expect(content).toContain("description: New description");
+      expect(content).toContain("Old prompt.");
+
+      process.env.HOME = originalHome;
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("should still reject empty description in create mode", async () => {
+      // In create mode (no existing persona), empty description should cancel
+      mockInput
+        .mockResolvedValueOnce("new-persona") // name
+        .mockResolvedValueOnce("");            // description (empty -> cancelled)
+
+      await runPersonaWizard(mockPi, mockCtx);
+
+      expect(mockNotify).toHaveBeenCalledWith("Wizard cancelled.", "info");
+    });
+  });
+
   describe("runEditPersonaWizard", () => {
     it("should update persona and delete old file when name changes", async () => {
       const tmpDir = fs.mkdtempSync("/tmp/persona-edit-test-");

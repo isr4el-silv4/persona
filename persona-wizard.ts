@@ -133,13 +133,19 @@ function ensureCtx(ctx: ExtensionContext | undefined): ExtensionContext {
 
 async function askInput(ctx: ExtensionContext, prompt: string, defaultValue?: string): Promise<string | null> {
   const c = ensureCtx(ctx);
-  if (defaultValue === "") {
-    // Show placeholder but allow empty input
-    const result = await c.ui.input(prompt);
-    return result;
-  }
   const result = await c.ui.input(prompt, defaultValue);
-  return result;
+  return typeof result === "string" ? result.trim() : result;
+}
+
+async function askInputWithSkip(ctx: ExtensionContext, prompt: string, existingValue: string): Promise<string | null> {
+  const c = ensureCtx(ctx);
+  const result = await c.ui.input(prompt, existingValue);
+  const trimmed = typeof result === "string" ? result.trim() : result;
+  // null or empty string → keep the existing value (user pressed Enter without changing)
+  if (trimmed === null || trimmed === "") {
+    return existingValue;
+  }
+  return trimmed;
 }
 
 async function askSelect(
@@ -281,8 +287,14 @@ async function runWizard(pi: ExtensionAPI, ctx: ExtensionContext, existingPerson
   try {
     // Step 1: Name
     const defaultName = existingPersona?.name || "my-persona";
-    const name = await askInput(ctx, "Persona name (letters, numbers, -, _ only):", defaultName);
-    if (!name) return ctx.ui.notify("Wizard cancelled.", "info");
+    let name: string | null;
+    if (existingPersona) {
+      name = await askInputWithSkip(ctx, "Persona name (letters, numbers, -, _ only):", defaultName);
+    } else {
+      name = await askInput(ctx, "Persona name (letters, numbers, -, _ only):", defaultName);
+    }
+    if (name === null) return ctx.ui.notify("Wizard cancelled.", "info");
+    if (name === "") return ctx.ui.notify("Wizard cancelled.", "info");
     const sanitizedName = name.toLowerCase().replace(/\s+/g, "-");
     if (!PERSONA_NAME_REGEX.test(sanitizedName)) {
       ctx.ui.notify("Invalid name. Only letters, numbers, hyphens (-), and underscores (_) are allowed.", "error");
@@ -291,8 +303,14 @@ async function runWizard(pi: ExtensionAPI, ctx: ExtensionContext, existingPerson
 
     // Step 2: Description
     const defaultDescription = existingPersona?.description || "";
-    const description = await askInput(ctx, `Description for "${name}" (e.g., "Fast codebase recon"):`, defaultDescription);
-    if (!description) return ctx.ui.notify("Wizard cancelled.", "info");
+    let description: string | null;
+    if (existingPersona) {
+      description = await askInputWithSkip(ctx, `Description for "${name}" (e.g., "Fast codebase recon"):`, defaultDescription);
+    } else {
+      description = await askInput(ctx, `Description for "${name}" (e.g., "Fast codebase recon"):`, defaultDescription);
+    }
+    if (description === null) return ctx.ui.notify("Wizard cancelled.", "info");
+    if (description === "" && !existingPersona) return ctx.ui.notify("Wizard cancelled.", "info");
 
     // Step 3: Tools
     const existingTools = existingPersona?.tools || [];
@@ -323,7 +341,12 @@ async function runWizard(pi: ExtensionAPI, ctx: ExtensionContext, existingPerson
     );
 
     // Step 7: System prompt
-    const systemPrompt = await askInput(ctx, "System prompt (press Enter when done):\n", existingPersona?.systemPrompt);
+    let systemPrompt: string | null;
+    if (existingPersona) {
+      systemPrompt = await askInputWithSkip(ctx, "System prompt:", existingPersona.systemPrompt);
+    } else {
+      systemPrompt = await askInput(ctx, "System prompt (press Enter when done):\n");
+    }
     if (systemPrompt === null) return ctx.ui.notify("Wizard cancelled.", "info");
 
     // Step 8: Scope
