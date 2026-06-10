@@ -1,6 +1,6 @@
 {
   "name": "@isr4el-silv4/persona",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Persona extension for pi",
   "license": "MIT",
   "author": "isr4el-silv4",
@@ -20,6 +20,7 @@
     "persona-wizard.ts",
     "tool-blocker.ts",
     "utils.ts",
+    "screenshot.jpeg",
     "README.md",
     "LICENSE"
   ],
@@ -32,7 +33,8 @@
   "pi": {
     "extensions": [
       "./index.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/isr4el-silv4/persona/master/screenshot.jpeg"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

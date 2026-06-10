@@ -1,5 +1,7 @@
 # Persona Extension
 
+![persona](https://raw.githubusercontent.com/isr4el-silv4/persona/master/screenshot.jpeg)
+
 A Pi extension that lets you create reusable personas — configurations that restrict which tools the agent can use and inject custom system prompts. Think of them as specialized modes for your Pi agent.
 
 ## Installation
