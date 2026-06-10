@@ -1,251 +1,103 @@
 # Persona Extension
 
-A Pi coding agent extension that manages custom personas — reusable configurations that restrict tools and inject system prompts.
+A Pi extension that lets you create reusable personas — configurations that restrict which tools the agent can use and inject custom system prompts. Think of them as specialized modes for your Pi agent.
 
-## Quick Start
-
-```bash
-/persona create          # Create a new persona via wizard
-/persona list            # List all available personas
-/persona <name>          # Activate a persona
-/persona none            # Clear active persona
-/persona edit <name>     # Edit an existing persona
-/persona delete <name>   # Delete a persona
-```
-
-## Architecture
-
-### File Structure
-
-```
-persona/
-├── index.ts                    # Main extension entry — event handlers + /persona command
-├── persona-wizard.ts           # Wizard flow for create/edit (multi-step UI)
-├── multi-select-list.ts        # Reusable checkbox list component for tool selection
-├── persona-indicator.ts        # TUI widget showing active persona in widget area
-├── utils.ts                    # Shared utilities: loadPersona, deletePersona, etc.
-├── package.json                # Dependencies + test config
-├── jest.config.js              # Jest configuration (mocks, moduleNameMapper)
-├── tsconfig.json               # TypeScript config
-└── test/                       # All tests
-    ├── persona-wizard.test.ts  # Wizard + YAML generation + CRUD tests
-    ├── multi-select-list.test.ts # MultiSelectList component tests
-    ├── persona-indicator.test.ts # PersonaIndicator widget tests
-    └── __mocks__/              # Jest mocks for Pi SDK
-        ├── @earendil-works/pi-coding-agent.ts
-        ├── @earendil-works/pi-tui.ts
-        └── @earendil-works/types.d.ts
-```
-
-### Data Flow
-
-```
-User: /persona create
-  → runPersonaWizard()          # persona-wizard.ts
-    → askInput() (name, desc, prompt)
-    → askToolsSelect()          # multi-select checkbox UI
-    → askSelect() (mode, scope)
-    → askConfirm() (inherit, interactive)
-    → runWizard() saves YAML
-
-User: /persona <name>
-  → index.ts handler
-    → loadPersona(name)         # utils.ts — reads YAML from disk
-    → pi.setActiveTools()       # restrict tools to persona's list
-    → currentPersona = loaded   # set global state
-    → before_agent_start fires  # inject system prompt
-
-User: /persona edit <name>
-  → runEditPersonaWizard()      # persona-wizard.ts
-    → runWizard(existingPersona) # same wizard, pre-filled values
-    → saves new YAML
-    → deletes old file if name/scope changed
-```
-
-### Key Files
-
-#### `index.ts` — Main Entry Point
-
-Exports a default function that registers the `/persona` command. Manages:
-
-- **Global state**: `currentPersona` (LoadedPersona | null), `originalTools` (string[] | null)
-- **Ephemeral personas**: `ephemeralPersonas` Map (cleared on session restart/fork/resume)
-- **Events**:
-  - `session_shutdown` — clears ephemeral personas
-  - `before_agent_start` — sets PersonaIndicator widget + injects system prompt
-  - `before_provider_request` — placeholder for debugging
-
-**Command routing** (in order):
-1. `create` → `runPersonaWizard()`
-2. `list` → shows persona list in widget
-3. `delete <name>` → deletes from global or project scope
-4. `edit <name>` → loads persona, opens edit wizard
-5. `<persona-name>` → activates persona (restricts tools, injects prompt)
-6. `none` / empty → clears active persona
-
-**Autocomplete** (`getArgumentCompletions`):
-- Commands: `create`, `list`, `delete`, `edit`
-- Personas: `[persona] <name>` prefix for activation
-- Delete/edit: `<scope-emoji> <name>` (🌍 global, 📁 project, ⚡ ephemeral)
-
-#### `persona-wizard.ts` — Wizard Flow
-
-**Types**:
-- `PersonaConfig` — persona data (name, description, tools, systemPromptMode, etc.)
-- `LoadedPersona` — PersonaConfig + scope + filePath
-- `SystemPromptMode` enum: `REPLACE`, `APPEND`
-- `PersonaScope` enum: `GLOBAL`, `PROJECT`, `EPHEMERAL`
-
-**Functions**:
-- `runPersonaWizard(pi, ctx)` — entry point for `/persona create`
-- `runEditPersonaWizard(pi, ctx, persona)` — entry point for `/persona edit <name>`
-- `runWizard(pi, ctx, existingPersona)` — shared wizard logic
-  - Step 1: Name (validated, sanitized to lowercase+hyphens)
-  - Step 2: Description
-  - Step 3: Tools (multi-select checkbox UI)
-  - Step 4: System prompt mode (replace/append)
-  - Step 5: Inherit project context (boolean)
-  - Step 6: Interactive (boolean)
-  - Step 7: System prompt (multiline input)
-  - Step 8: Scope (global/project/ephemeral)
-- `generateYaml(config)` — generates YAML frontmatter + system prompt
-- `listPersonas(ephemeral)` — lists all personas from disk + memory
-
-**Edit behavior**: When `existingPersona` is provided, the wizard pre-fills all fields with existing values. If name or scope changes, the old file is deleted before writing the new one.
-
-#### `multi-select-list.ts` — Checkbox Component
-
-Custom TUI component because Pi's `SelectList` is single-select only.
-
-- Supports keyboard navigation: ↑↓, space (toggle), Ctrl+A (select all), Enter (continue), Esc (cancel)
-- `onEmpty` callback fires when no items selected
-- `onSelect` / `onCancel` callbacks for completion
-- `getSelectedValues()` returns selected item values
-
-#### `persona-indicator.ts` — TUI Widget
-
-Displays active persona in the widget area (above/below editor).
-
-- Shows: name, description, tools count, prompt mode
-- Scope emojis: 🌍 global, 📁 project, ⚡ ephemeral
-- Caching + invalidation for performance
-- Line truncation for long descriptions
-
-#### `utils.ts` — Shared Utilities
-
-- `loadPersona(name)` — loads persona from global or project YAML file
-- `deletePersona(name, scope)` — deletes persona YAML file
-- `parseYamlFrontmatter(content)` — parses YAML frontmatter (no external deps)
-- `getScopeEmoji(scope)` — returns emoji for scope type
-
-### Storage Locations
-
-| Scope | Path | Persistence |
-|-------|------|-------------|
-| Global | `~/.pi/agent/personas/<name>.yaml` | Disk |
-| Project | `.pi/personas/<name>.yaml` | Disk |
-| Ephemeral | In-memory Map | Lost on restart |
-
-### YAML Format
-
-```yaml
----
-name: scout
-description: Fast codebase recon
-tools: read, grep, find, ls
-systemPromptMode: replace
-inheritProjectContext: false
-interactive: true
----
-
-Your system prompt goes here.
-```
-
-- Filename = sanitized name (lowercase, spaces → hyphens)
-- `systemPromptMode`: `replace` (overwrite) or `append` (add to end)
-- `tools`: comma-separated list of tool names
-
-## Testing
+## Installation
 
 ```bash
-# Run all tests
-npx jest
-
-# Run specific test file
-npx jest test/persona-wizard.test.ts
-
-# Run with coverage
-npx jest --coverage
+pi install npm:@isr4el-silv4/persona
 ```
 
-**Test structure**:
-- All tests in `test/` directory
-- Mocks in `test/__mocks__/` (redirected via `moduleNameMapper` in `jest.config.js`)
-- Mocked UI methods: `input`, `select`, `confirm`, `notify`, `custom`, `setWidget`
-- `mockCustom` implementation simulates multi-select completion by calling `handleInput("enter")`
+## What Are Personas?
 
-**Current test count**: 52 tests across 3 suites (persona-wizard, multi-select-list, persona-indicator)
+Personas let you constrain and customize the agent's behavior. Each persona defines:
 
-## Key Patterns & Conventions
+- **A subset of tools** — restrict the agent to only the tools it needs
+- **A system prompt** — custom instructions that shape how the agent behaves
+- **A scope** — global (all projects), project-local, or ephemeral (one session only)
 
-### Enum Naming
-- Properties are UPPER_CASE with lowercase values: `SystemPromptMode.REPLACE` → `"replace"`
+### Example Personas
 
-### Name Sanitization
-```typescript
-const sanitizedName = name.toLowerCase().replace(/\s+/g, "-");
-// "My Persona" → "my-persona"
+- **Scout** — only `read`, `grep`, `find`, `ls` for fast codebase exploration
+- **Reviewer** — only `read` and `grep` for reading and reviewing code
+- **Architect** — full tool access with a system prompt focused on design decisions
+- **Bug Hunter** — restricted tools with instructions to focus on debugging
+
+## Usage
+
+### Create a Persona
+
+```bash
+/persona create
 ```
 
-### UI Method Return Values
-- `ui.select()` returns **label string** (not index) — use `options.find(o => o.label === result)`
-- `ui.input()` returns string or null (null = cancelled)
-- `ui.confirm()` returns boolean
-- `ui.notify()` takes (message, level?) — level is "success", "error", "warn", "info"
+Starts an interactive wizard that walks you through:
 
-### Key Identifiers
-- Use string literals matching Pi's `matchesKey` API: `"space"`, `"ctrl+a"`, `"enter"`, `"escape"`
-- NOT: `Key.SPACE` or `" "` or `"ctrl(a)"`
+1. **Name** — e.g., `scout` (lowercase, hyphens for spaces)
+2. **Description** — short summary shown in the UI
+3. **Tools** — pick which tools the persona can use (checkbox list)
+4. **System prompt mode** — `replace` (overwrite Pi's default) or `append` (add to it)
+5. **Inherit project context** — include project-level instructions
+6. **Interactive** — allow the agent to ask you questions
+7. **System prompt** — the actual instructions for the agent
+8. **Scope** — global, project, or ephemeral
 
-### Mock Setup Pattern
-```typescript
-mockInput.mockReset().mockResolvedValue("default");
-mockSelect.mockReset().mockResolvedValue("Global (~/.pi/agent/personas/)");
-mockConfirm.mockReset().mockResolvedValue(true);
-mockCustom.mockImplementation((callback) => {
-  const result = callback(mockTui, mockTheme, null, () => {});
-  if (result?.handleInput) result.handleInput("enter");
-});
+### Activate a Persona
+
+```bash
+/persona scout
 ```
 
-### Git Workflow
-- **NEVER** push directly to master — always create feature branch, open PR
-- Commit messages: `<gitmoji> #<ticket> <description>` (e.g., `🐛 #bugfix Fix edit persona`)
-- Extensions directory excluded from `~/.pi` config repo (`my-pi-coding-agent`)
+The agent will now use only the tools and instructions defined by that persona. A badge appears in the UI showing the active persona.
 
-## Common Tasks
+### List Available Personas
 
-### Add a new wizard step
-1. Add prompt in `runWizard()` (after existing steps)
-2. Call appropriate helper: `askInput()`, `askSelect()`, `askConfirm()`
-3. Pre-fill from `existingPersona?.<field>` if editing
-4. Add to `PersonaConfig` interface if needed
-5. Add to `generateYaml()` output
-6. Update tests
+```bash
+/persona list
+```
 
-### Add a new command
-1. Add routing in `index.ts` handler (before persona activation block)
-2. Add autocomplete in `getArgumentCompletions()`
-3. Import/export functions from other files as needed
+Shows all personas with their scope (🌍 global, 📁 project, ⚡ ephemeral).
 
-### Add a new TUI component
-1. Create file in root (e.g., `new-component.ts`)
-2. Use `@earendil-works/pi-tui` types (Container, Text, Component)
-3. Implement `render(width)` and `invalidate()` methods
-4. Register widget via `ctx.ui.setWidget("key", renderFn)`
+### Edit a Persona
 
-### Debugging
-- Uncomment `console.log(JSON.stringify(event.payload, null, 2))` in `before_provider_request`
-- Use `ctx.ui.notify()` for intermediate values during wizard flow
-- Check `~/.pi/agent/personas/` for YAML files
-- Run `npx jest --verbose` for detailed test output
+```bash
+/persona edit scout
+```
+
+Re-opens the wizard pre-filled with the persona's current values. Change anything and save.
+
+### Delete a Persona
+
+```bash
+/persona delete scout
+```
+
+Removes the persona from disk.
+
+### Clear Active Persona
+
+```bash
+/persona none
+```
+
+Returns the agent to its default tool set and system prompt.
+
+## Scopes
+
+| Scope | Where It's Stored | When To Use |
+|-------|-------------------|-------------|
+| **Global** | `~/.pi/agent/personas/` | Personas you use across all projects |
+| **Project** | `.pi/personas/` | Personas specific to the current project |
+| **Ephemeral** | In-memory only | Quick one-off personas that disappear after the session |
+
+## System Prompt Modes
+
+- **`replace`** — Your prompt completely replaces Pi's default system prompt. Use this for focused personas that shouldn't know about general-purpose behavior.
+- **`append`** — Your prompt is added to the end of Pi's default. Use this to add constraints or instructions on top of the default behavior.
+
+## Tips
+
+- Use **ephemeral** scope to experiment with a persona before saving it permanently
+- Name personas with short, descriptive names — you'll type them often
+- Use `append` mode when you want the agent to keep its general capabilities while adding new constraints
+- Use `replace` mode when you want a tightly focused agent with no extra behavior
