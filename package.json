@@ -1,6 +1,6 @@
 {
   "name": "@isr4el-silv4/persona",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Persona extension for pi",
   "license": "MIT",
   "author": "isr4el-silv4",
@@ -10,6 +10,7 @@
   },
   "keywords": [
     "pi-package",
+    "pi-extension",
     "pi",
     "pi-coding-agent"
   ],
