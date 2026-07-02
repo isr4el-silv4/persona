@@ -100,6 +100,89 @@ describe("checkToolBlock", () => {
     expect(result!.reason).toContain("bash");
     expect(result!.reason).toContain("code-reviewer");
   });
+
+  /**
+   * Test 6: `_sh` tools are **always allowed** even when NOT in persona's `tools` array
+   */
+  it("should always allow _sh tools regardless of persona tools list", () => {
+    const persona = makePersona({
+      name: "scout",
+      tools: ["read", "grep"],
+    });
+
+    const result = checkToolBlock(persona, "status_sh");
+
+    expect(result).toBeNull();
+  });
+
+  /**
+   * Test 7: `_sh` tools are **always allowed** even for personas with empty tools list
+   */
+  it("should always allow _sh tools even for personas with empty tools list", () => {
+    const persona = makePersona({
+      name: "minimal",
+      tools: [],
+    });
+
+    const result = checkToolBlock(persona, "deploy_sh");
+
+    expect(result).toBeNull();
+  });
+
+  /**
+   * Test 8: `_sh` tools are **always allowed** for ephemeral personas
+   */
+  it("should always allow _sh tools for ephemeral personas", () => {
+    const persona = makePersona({
+      name: "temp-helper",
+      tools: ["read"],
+      scope: "ephemeral",
+    });
+
+    const result = checkToolBlock(persona, "lint_sh");
+
+    expect(result).toBeNull();
+  });
+
+  /**
+   * Test 9: Non-`_sh` tools are still blocked when not in persona's tools list
+   * (regression test — ensuring _sh bypass doesn't affect normal blocking)
+   */
+  it("should still block non-_sh tools not in persona tools list", () => {
+    const persona = makePersona({
+      name: "scout",
+      tools: ["read", "grep"],
+    });
+
+    const result = checkToolBlock(persona, "web_search");
+
+    expect(result).not.toBeNull();
+    expect(result!.block).toBe(true);
+  });
+
+  /**
+   * Test 10: `_sh` suffix must be exact — tools like "my_sh_backup" should still be blocked
+   */
+  it("should block tools that contain _sh but do not end with it", () => {
+    const persona = makePersona({
+      name: "scout",
+      tools: ["read", "grep"],
+    });
+
+    const result = checkToolBlock(persona, "my_sh_backup");
+
+    expect(result).not.toBeNull();
+    expect(result!.block).toBe(true);
+  });
+
+  /**
+   * Test 11: `_sh` tools are allowed even when no persona is active (already allowed, no regression)
+   */
+  it("should allow _sh tools when no persona is active", () => {
+    const result = checkToolBlock(null, "status_sh");
+
+    expect(result).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

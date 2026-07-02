@@ -1,16 +1,18 @@
-# Persona Extension
+<div align="center">
+  <img src="https://i.postimg.cc/L8zZgntL/persona.jpg" alt="persona banner" style="max-width:800px;">
+</div>
 
-![persona](https://i.postimg.cc/L8zZgntL/persona.jpg)
+# persona
 
 A Pi extension that lets you create reusable personas — configurations that restrict which tools the agent can use and inject custom system prompts. Think of them as specialized modes for your Pi agent.
 
-## Installation
+## 📦 Installation
 
 ```bash
 pi install npm:@isr4el-silv4/persona
 ```
 
-## What Are Personas?
+## 🎭 What Are Personas?
 
 Personas let you constrain and customize the agent's behavior. Each persona defines:
 
@@ -18,16 +20,20 @@ Personas let you constrain and customize the agent's behavior. Each persona defi
 - **A system prompt** — custom instructions that shape how the agent behaves
 - **A scope** — global (all projects), project-local, or ephemeral (one session only)
 
-### Example Personas
+### 💡 Example Personas
 
 - **Scout** — only `read`, `grep`, `find`, `ls` for fast codebase exploration
 - **Reviewer** — only `read` and `grep` for reading and reviewing code
 - **Architect** — full tool access with a system prompt focused on design decisions
 - **Bug Hunter** — restricted tools with instructions to focus on debugging
 
-## Usage
+### ⚙️ Script Tools Exception
 
-### Create a Persona
+Tools registered via [pi-script-tools](https://pi.dev/packages/@isr4el-silv4/pi-script-tools?name=isr4el-silv4) (shell scripts with the `_sh` suffix, such as `status_sh`, `deploy_sh`, etc.) are **always available** regardless of the persona's tool restrictions. This exception ensures that project scripts remain accessible in every persona without needing to be listed explicitly in each persona's `tools:` field.
+
+## 🚀 Usage
+
+### ✨ Create a Persona
 
 ```bash
 /persona create
@@ -44,7 +50,7 @@ Starts an interactive wizard that walks you through:
 7. **System prompt** — the actual instructions for the agent
 8. **Scope** — global, project, or ephemeral
 
-### Activate a Persona
+### ▶️ Activate a Persona
 
 ```bash
 /persona scout
@@ -52,7 +58,7 @@ Starts an interactive wizard that walks you through:
 
 The agent will now use only the tools and instructions defined by that persona. A badge appears in the UI showing the active persona.
 
-### List Available Personas
+### 📋 List Available Personas
 
 ```bash
 /persona list
@@ -60,7 +66,7 @@ The agent will now use only the tools and instructions defined by that persona. 
 
 Shows all personas with their scope (🌍 global, 📁 project, ⚡ ephemeral).
 
-### Edit a Persona
+### ✏️ Edit a Persona
 
 ```bash
 /persona edit scout
@@ -68,7 +74,7 @@ Shows all personas with their scope (🌍 global, 📁 project, ⚡ ephemeral).
 
 Re-opens the wizard pre-filled with the persona's current values. Change anything and save.
 
-### Delete a Persona
+### 🗑️ Delete a Persona
 
 ```bash
 /persona delete scout
@@ -76,7 +82,7 @@ Re-opens the wizard pre-filled with the persona's current values. Change anythin
 
 Removes the persona from disk.
 
-### Clear Active Persona
+### 🔄 Clear Active Persona
 
 ```bash
 /persona none
@@ -84,7 +90,7 @@ Removes the persona from disk.
 
 Returns the agent to its default tool set and system prompt.
 
-## Scopes
+## 🌐 Scopes
 
 | Scope | Where It's Stored | When To Use |
 |-------|-------------------|-------------|
@@ -92,12 +98,12 @@ Returns the agent to its default tool set and system prompt.
 | **Project** | `.pi/personas/` | Personas specific to the current project |
 | **Ephemeral** | In-memory only | Quick one-off personas that disappear after the session |
 
-## System Prompt Modes
+## 📝 System Prompt Modes
 
 - **`replace`** — Your prompt completely replaces Pi's default system prompt. Use this for focused personas that shouldn't know about general-purpose behavior.
 - **`append`** — Your prompt is added to the end of Pi's default. Use this to add constraints or instructions on top of the default behavior.
 
-## Tips
+## 💎 Tips
 
 - Use **ephemeral** scope to experiment with a persona before saving it permanently
 - Name personas with short, descriptive names — you'll type them often

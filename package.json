@@ -1,8 +1,8 @@
 {
   "name": "@isr4el-silv4/persona",
-  "version": "1.0.4",
-  "description": "Persona extension for pi",
-  "license": "MIT",
+  "version": "1.0.5",
+  "description": "Manage Personas for Pi Coding Agent",
+  "license": "Apache-2.0",
   "author": "isr4el-silv4",
   "repository": {
     "type": "git",
@@ -13,17 +13,6 @@
     "pi-extension",
     "pi",
     "pi-coding-agent"
-  ],
-  "files": [
-    "index.ts",
-    "multi-select-list.ts",
-    "persona-indicator.ts",
-    "persona-wizard.ts",
-    "tool-blocker.ts",
-    "utils.ts",
-    "screenshot.jpeg",
-    "README.md",
-    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"

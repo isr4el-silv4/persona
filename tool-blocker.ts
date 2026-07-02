@@ -13,6 +13,9 @@ export function checkToolBlock(
 ): { block: true; reason: string } | null {
   if (!currentPersona) return null;
 
+  // Script tools (discovered by pi-script-tools) are always allowed
+  if (toolName.endsWith('_sh')) return null;
+
   if (!currentPersona.tools.includes(toolName)) {
     return {
       block: true,

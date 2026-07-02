@@ -186,7 +186,10 @@ export default function (pi: ExtensionAPI) {
           scope: "ephemeral",
         } as LoadedPersona;
         originalTools = pi.getAllTools().map((t) => t.name);
-        pi.setActiveTools(persona.tools);
+        const allTools = pi.getAllTools();
+        const scriptToolNames = allTools.filter((t) => t.name.endsWith('_sh')).map((t) => t.name);
+        const mergedTools = [...new Set([...persona.tools, ...scriptToolNames])];
+        pi.setActiveTools(mergedTools);
         ctx.ui.notify(`✅ Activated ephemeral persona: ${persona.name}`, "success");
         return;
       }
@@ -206,7 +209,8 @@ export default function (pi: ExtensionAPI) {
       if (loaded) {
         const allTools = pi.getAllTools();
         const availableToolNames = allTools.map((t) => t.name);
-        const personaTools = loaded.tools.filter((t) => availableToolNames.includes(t));
+        const scriptToolNames = allTools.filter((t) => t.name.endsWith('_sh')).map((t) => t.name);
+        const personaTools = [...new Set([...loaded.tools, ...scriptToolNames])].filter((t) => availableToolNames.includes(t));
 
         originalTools = pi.getAllTools().map((t) => t.name);
 
