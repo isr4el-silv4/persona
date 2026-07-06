@@ -31,6 +31,10 @@ Personas let you constrain and customize the agent's behavior. Each persona defi
 
 Tools registered via [pi-script-tools](https://pi.dev/packages/@isr4el-silv4/pi-script-tools?name=isr4el-silv4) (shell scripts with the `_sh` suffix, such as `status_sh`, `deploy_sh`, etc.) are **always available** regardless of the persona's tool restrictions. This exception ensures that project scripts remain accessible in every persona without needing to be listed explicitly in each persona's `tools:` field.
 
+### 🌐 Browser Tools Exception
+
+Tools registered via [pi-web-ui](https://pi.dev/packages/@isr4el-silv4/pi-web-ui?name=isr4el-silv4) (browser tools with the `browser_` prefix, such as `browser_list_tabs`, `browser_get_page_html`, etc.) are **always available** regardless of the persona's tool restrictions. This exception ensures that browser automation capabilities remain accessible in every persona without needing to be listed explicitly in each persona's `tools:` field.
+
 ## 🚀 Usage
 
 ### ✨ Create a Persona
