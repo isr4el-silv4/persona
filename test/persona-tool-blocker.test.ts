@@ -183,6 +183,144 @@ describe("checkToolBlock", () => {
 
     expect(result).toBeNull();
   });
+
+  // --------------------------------------------------------------------------
+  // pi-web-ui browser tool tests
+  // --------------------------------------------------------------------------
+
+  /**
+   * Test 12: `browser_` tools are **always allowed** even when NOT in persona's `tools` array
+   */
+  it("should always allow browser_ tools regardless of persona tools list", () => {
+    const persona = makePersona({
+      name: "scout",
+      tools: ["read", "grep"],
+    });
+
+    const result = checkToolBlock(persona, "browser_list_tabs");
+
+    expect(result).toBeNull();
+  });
+
+  /**
+   * Test 13: `browser_` tools are **always allowed** for personas with empty tools list
+   */
+  it("should always allow browser_ tools even for personas with empty tools list", () => {
+    const persona = makePersona({
+      name: "minimal",
+      tools: [],
+    });
+
+    const result = checkToolBlock(persona, "browser_get_current_tab");
+
+    expect(result).toBeNull();
+  });
+
+  /**
+   * Test 14: `browser_` tools are **always allowed** for ephemeral personas
+   */
+  it("should always allow browser_ tools for ephemeral personas", () => {
+    const persona = makePersona({
+      name: "temp-helper",
+      tools: ["read"],
+      scope: "ephemeral",
+    });
+
+    const result = checkToolBlock(persona, "browser_get_page_html");
+
+    expect(result).toBeNull();
+  });
+
+  /**
+   * Test 15: Non-`browser_` tools are still blocked when not in persona's tools list
+   * (regression test — ensuring browser_ bypass doesn't affect normal blocking)
+   */
+  it("should still block non-browser_ tools not in persona tools list", () => {
+    const persona = makePersona({
+      name: "scout",
+      tools: ["read", "grep"],
+    });
+
+    const result = checkToolBlock(persona, "web_search");
+
+    expect(result).not.toBeNull();
+    expect(result!.block).toBe(true);
+  });
+
+  /**
+   * Test 16: `browser_` prefix must be exact at the start — tools like "my_browser_list" should still be blocked
+   */
+  it("should block tools that contain browser_ but do not start with it", () => {
+    const persona = makePersona({
+      name: "scout",
+      tools: ["read", "grep"],
+    });
+
+    const result = checkToolBlock(persona, "my_browser_list");
+
+    expect(result).not.toBeNull();
+    expect(result!.block).toBe(true);
+  });
+
+  /**
+   * Test 17: `browser_` tools are allowed even when no persona is active (already allowed, no regression)
+   */
+  it("should allow browser_ tools when no persona is active", () => {
+    const result = checkToolBlock(null, "browser_capture_screenshot");
+
+    expect(result).toBeNull();
+  });
+
+  /**
+   * Test 18: All pi-web-ui browser tools should be allowed regardless of persona
+   */
+  it("should allow all common pi-web-ui browser tools regardless of persona", () => {
+    const persona = makePersona({
+      name: "minimal",
+      tools: [],
+    });
+
+    const browserTools = [
+      "browser_list_tabs",
+      "browser_get_current_tab",
+      "browser_get_page_html",
+      "browser_get_page_text",
+      "browser_get_selection",
+      "browser_capture_screenshot",
+      "browser_get_console_logs",
+      "browser_clear_console_log_buffer",
+      "browser_start_network_capture",
+      "browser_stop_network_capture",
+      "browser_get_network_requests",
+      "browser_get_network_request",
+      "browser_get_network_response_body",
+      "browser_attach_debugger",
+      "browser_detach_debugger",
+      "browser_send_cdp_command",
+      "browser_evaluate_script",
+      "browser_get_cookies",
+      "browser_get_local_storage",
+      "browser_get_session_storage",
+    ];
+
+    for (const tool of browserTools) {
+      const result = checkToolBlock(persona, tool);
+      expect(result).toBeNull();
+    }
+  });
+
+  /**
+   * Test 19: Both `_sh` and `browser_` tools should be allowed together
+   */
+  it("should allow both _sh and browser_ tools regardless of persona tools list", () => {
+    const persona = makePersona({
+      name: "scout",
+      tools: ["read", "grep"],
+    });
+
+    expect(checkToolBlock(persona, "status_sh")).toBeNull();
+    expect(checkToolBlock(persona, "browser_list_tabs")).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

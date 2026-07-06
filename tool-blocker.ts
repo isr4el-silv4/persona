@@ -16,6 +16,9 @@ export function checkToolBlock(
   // Script tools (discovered by pi-script-tools) are always allowed
   if (toolName.endsWith('_sh')) return null;
 
+  // Browser tools (from pi-web-ui) are always allowed
+  if (toolName.startsWith('browser_')) return null;
+
   if (!currentPersona.tools.includes(toolName)) {
     return {
       block: true,

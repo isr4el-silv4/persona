@@ -188,7 +188,8 @@ export default function (pi: ExtensionAPI) {
         originalTools = pi.getAllTools().map((t) => t.name);
         const allTools = pi.getAllTools();
         const scriptToolNames = allTools.filter((t) => t.name.endsWith('_sh')).map((t) => t.name);
-        const mergedTools = [...new Set([...persona.tools, ...scriptToolNames])];
+        const browserToolNames = allTools.filter((t) => t.name.startsWith('browser_')).map((t) => t.name);
+        const mergedTools = [...new Set([...persona.tools, ...scriptToolNames, ...browserToolNames])];
         pi.setActiveTools(mergedTools);
         ctx.ui.notify(`✅ Activated ephemeral persona: ${persona.name}`, "success");
         return;
@@ -210,7 +211,8 @@ export default function (pi: ExtensionAPI) {
         const allTools = pi.getAllTools();
         const availableToolNames = allTools.map((t) => t.name);
         const scriptToolNames = allTools.filter((t) => t.name.endsWith('_sh')).map((t) => t.name);
-        const personaTools = [...new Set([...loaded.tools, ...scriptToolNames])].filter((t) => availableToolNames.includes(t));
+        const browserToolNames = allTools.filter((t) => t.name.startsWith('browser_')).map((t) => t.name);
+        const personaTools = [...new Set([...loaded.tools, ...scriptToolNames, ...browserToolNames])].filter((t) => availableToolNames.includes(t));
 
         originalTools = pi.getAllTools().map((t) => t.name);
 
