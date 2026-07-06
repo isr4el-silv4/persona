@@ -13,3 +13,4 @@ package-lock.json
 *.test.ts
 banner.jpeg
 .npmrc
+jest.config.js
